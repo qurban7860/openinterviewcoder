@@ -9,6 +9,11 @@ const SYSTEM_PROMPT = `You are an interview coding assistant. Answer the user's 
 For coding problems, explain the approach briefly, then provide a correct, readable solution and its complexity when useful. Ask a clarifying question only when essential. Keep responses concise and use Markdown.`;
 const MAX_PROMPT_LENGTH = 20000;
 const MAX_SCREENSHOT_BYTES = 20 * 1024 * 1024;
+const GEMINI_MODEL_FALLBACKS = [
+  "gemini-3.5-flash-lite",
+  "gemini-2.5-flash-lite",
+  "gemini-3.8-flash",
+];
 
 let isInitialized = false;
 
@@ -162,27 +167,59 @@ async function callProvider(provider, apiKey, history, prompt, image) {
   }
 
   if (provider === "gemini") {
-    const model = "gemini-3.8-flash";
-    const response = await axios.post(
-      "https://generativelanguage.googleapis.com/v1beta/interactions",
-      {
-        model,
-        input: createGeminiInput(history, prompt, image),
-        system_instruction: SYSTEM_PROMPT,
-        store: false,
-      },
-      { timeout: 60000, headers: { "x-goog-api-key": apiKey } }
+    const failures = [];
+    for (const model of GEMINI_MODEL_FALLBACKS) {
+      try {
+        const response = await axios.post(
+          "https://generativelanguage.googleapis.com/v1beta/interactions",
+          {
+            model,
+            input: createGeminiInput(history, prompt, image),
+            system_instruction: SYSTEM_PROMPT,
+            store: false,
+          },
+          { timeout: 60000, headers: { "x-goog-api-key": apiKey } }
+        );
+        const text =
+          response.data.output_text ||
+          (response.data.steps || [])
+            .filter((step) => step.type === "model_output")
+            .flatMap((step) => step.content || [])
+            .filter((part) => part.type === "text")
+            .map((part) => part.text || "")
+            .join("\n")
+            .trim();
+        if (!text) {
+          throw new Error(`${model} returned an empty response.`);
+        }
+        if (failures.length > 0) {
+          console.warn(
+            `Gemini model fallback succeeded with ${model} after ${failures.length} unavailable or busy model(s).`
+          );
+        }
+        return { text, model };
+      } catch (error) {
+        const status = error.response?.status;
+        const canFallback =
+          status === 404 ||
+          status === 429 ||
+          status === 500 ||
+          status === 502 ||
+          status === 503 ||
+          status === 504;
+        if (!canFallback) throw error;
+
+        const reason =
+          error.response.data?.error?.message ||
+          error.response.data?.message ||
+          error.message;
+        failures.push(`${model}: ${reason}`);
+        console.warn(`Gemini model ${model} unavailable (${status}); trying fallback.`);
+      }
+    }
+    throw new Error(
+      `No configured Gemini model is currently available. Tried ${GEMINI_MODEL_FALLBACKS.join(", ")}. ${failures.join(" | ")}`
     );
-    const text =
-      response.data.output_text ||
-      (response.data.steps || [])
-        .filter((step) => step.type === "model_output")
-        .flatMap((step) => step.content || [])
-        .filter((part) => part.type === "text")
-        .map((part) => part.text || "")
-        .join("\n")
-        .trim();
-    return { text, model };
   }
 
   if (provider === "anthropic") {
