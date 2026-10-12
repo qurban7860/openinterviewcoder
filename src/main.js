@@ -34,10 +34,8 @@ ipcMain.handle("scroll-chat", (event, direction) => {
 });
 
 ipcMain.handle("save-settings", async (event, settings) => {
-  if (settings.openaiKey) {
+  if (typeof settings.openaiKey === "string") {
     config.setOpenAIKey(settings.openaiKey);
-    // Reinitialize LLM service with new API key
-    await initializeLLMService();
   }
   return true;
 });
@@ -154,7 +152,14 @@ function createMenuTemplate() {
 }
 
 function createInvisibleWindow() {
+  const { workArea } = screen.getPrimaryDisplay();
+  const width = 500;
+  const height = 700;
   invisibleWindow = new BrowserWindow({
+    width,
+    height,
+    x: Math.max(workArea.x, workArea.x + workArea.width - width - 24),
+    y: workArea.y + 24,
     frame: false,
     transparent: true,
     hasShadow: false,
@@ -179,19 +184,20 @@ function createInvisibleWindow() {
   invisibleWindow.setContentProtection(true);
 
   // Always ignore mouse events to prevent interaction with screen sharing
-  invisibleWindow.setIgnoreMouseEvents(true);
-  invisibleWindow.webContents.isIgnoringMouseEvents = true;
+  invisibleWindow.setIgnoreMouseEvents(false);
 
-  invisibleWindow.loadFile("index.html");
+  invisibleWindow.loadFile(path.join(app.getAppPath(), "index.html"));
 
   // Open DevTools in development
   if (process.argv.includes("--debug")) {
     invisibleWindow.webContents.openDevTools();
   }
 
-  // Handle window visibility
+  // Handle window visibility without recursively triggering the show event
   invisibleWindow.on("show", () => {
-    invisibleWindow.showInactive();
+    if (!invisibleWindow.isVisible()) {
+      invisibleWindow.showInactive();
+    }
   });
 
   // Prevent the window from being closed with mouse
@@ -230,7 +236,7 @@ function createSettingsWindow() {
     },
   });
 
-  settingsWindow.loadFile("settings.html");
+  settingsWindow.loadFile(path.join(app.getAppPath(), "settings.html"));
 
   // Open DevTools in development
   if (process.argv.includes("--debug")) {
@@ -251,188 +257,146 @@ function createSettingsWindow() {
   });
 }
 
-// Register global shortcuts
-function registerShortcuts() {
-  // Screenshot shortcut (Command/Ctrl + H)
-  globalShortcut.register("CommandOrControl+H", async () => {
-    try {
-      // Hide window before taking screenshot
-      if (invisibleWindow && invisibleWindow.isVisible()) {
-        invisibleWindow.hide();
-      }
+function registerShortcut(accelerator, callback) {
+  if (!globalShortcut.register(accelerator, callback)) {
+    console.warn(`Unable to register global shortcut: ${accelerator}`);
+  }
+}
 
-      // Wait for window to hide
-      await new Promise((resolve) => setTimeout(resolve, 100));
+function toggleAssistantVisibility() {
+  if (!invisibleWindow || invisibleWindow.isDestroyed()) return;
+  if (invisibleWindow.isVisible()) {
+    invisibleWindow.hide();
+  } else {
+    invisibleWindow.showInactive();
+  }
+}
 
-      // Check permission and take screenshot
-      const hasPermission = await ensureScreenRecordingPermission();
-      if (!hasPermission) {
-        console.log("Permission not granted. Skipping screenshot.");
-        return;
-      }
+async function takeScreenshot() {
+  const wasVisible = invisibleWindow && invisibleWindow.isVisible();
+  try {
+    if (wasVisible) invisibleWindow.hide();
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    if (!(await ensureScreenRecordingPermission())) return;
 
-      const screenshotPath = await captureFullScreen(desktopCapturer, screen);
-      if (screenshotPath) {
-        console.log("Screenshot saved:", screenshotPath);
-        // Notify renderer about successful capture
-        if (invisibleWindow) {
-          invisibleWindow.webContents.send("screenshot-captured", {
-            filePath: screenshotPath,
-            timestamp: Date.now(),
-          });
-        }
-      }
-
-      // Show window again after a brief delay
-      setTimeout(() => {
-        if (invisibleWindow) {
-          invisibleWindow.showInactive();
-        }
-      }, 200);
-    } catch (error) {
-      console.error("Screenshot failed:", error);
-      if (invisibleWindow) {
-        invisibleWindow.showInactive();
-      }
+    const screenshotPath = await captureFullScreen(desktopCapturer, screen);
+    if (screenshotPath && invisibleWindow && !invisibleWindow.isDestroyed()) {
+      invisibleWindow.webContents.send("screenshot-captured", {
+        filePath: screenshotPath,
+        timestamp: Date.now(),
+      });
     }
-  });
-
-  // Toggle visibility shortcut (Command/Ctrl + B)
-  globalShortcut.register("CommandOrControl+B", () => {
-    if (invisibleWindow.isVisible()) {
-      invisibleWindow.hide();
-    } else {
+  } catch (error) {
+    console.error("Screenshot failed:", error);
+  } finally {
+    if (wasVisible && invisibleWindow && !invisibleWindow.isDestroyed()) {
       invisibleWindow.showInactive();
     }
-  });
+  }
+}
+
+function moveAssistant(xOffset, yOffset) {
+  if (!invisibleWindow || invisibleWindow.isDestroyed()) return;
+  const display = screen.getDisplayMatching(invisibleWindow.getBounds());
+  const workArea = display.workArea;
+  const [x, y] = invisibleWindow.getPosition();
+  const [width, height] = invisibleWindow.getSize();
+  const newX = Math.min(
+    Math.max(x + xOffset, workArea.x),
+    workArea.x + workArea.width - width
+  );
+  const newY = Math.min(
+    Math.max(y + yOffset, workArea.y),
+    workArea.y + workArea.height - height
+  );
+  invisibleWindow.setPosition(newX, newY);
+}
+
+function registerShortcuts() {
+  registerShortcut("CommandOrControl+Shift+S", takeScreenshot);
+  registerShortcut("CommandOrControl+Shift+H", toggleAssistantVisibility);
+  registerShortcut("CommandOrControl+B", toggleAssistantVisibility);
+  registerShortcut("CommandOrControl+,", createSettingsWindow);
 
   // Test response shortcut (Command/Ctrl + Shift + T)
-  globalShortcut.register("CommandOrControl+Shift+T", async () => {
-    if (invisibleWindow) {
-      try {
-        await invisibleWindow.webContents.executeJavaScript(`
-          window.electronAPI.testResponse("write python code to print 'Hello, world!'");
-        `);
-      } catch (error) {
-        console.error("Failed to test response:", error);
-      }
+  registerShortcut("CommandOrControl+Shift+T", () => {
+    if (invisibleWindow && !invisibleWindow.isDestroyed()) {
+      invisibleWindow.webContents.send(
+        "assistant-question",
+        "Write Python code to print 'Hello, world!'"
+      );
     }
   });
 
-  // Window movement shortcuts
   const NUDGE_AMOUNT = 50;
-  const screenBounds = screen.getPrimaryDisplay().workAreaSize;
-
-  // Nudge window with arrow keys
-  globalShortcut.register("CommandOrControl+Left", () => {
-    if (invisibleWindow) {
-      const [x, y] = invisibleWindow.getPosition();
-      invisibleWindow.setPosition(x - NUDGE_AMOUNT, y);
-    }
+  registerShortcut("CommandOrControl+Left", () =>
+    moveAssistant(-NUDGE_AMOUNT, 0)
+  );
+  registerShortcut("CommandOrControl+Right", () =>
+    moveAssistant(NUDGE_AMOUNT, 0)
+  );
+  registerShortcut("CommandOrControl+Up", () =>
+    moveAssistant(0, -NUDGE_AMOUNT)
+  );
+  registerShortcut("CommandOrControl+Down", () =>
+    moveAssistant(0, NUDGE_AMOUNT)
+  );
+  registerShortcut("CommandOrControl+Shift+Left", () =>
+    moveAssistant(-10000, -10000)
+  );
+  registerShortcut("CommandOrControl+Shift+Right", () => {
+    if (!invisibleWindow || invisibleWindow.isDestroyed()) return;
+    const { workArea } = screen.getDisplayMatching(
+      invisibleWindow.getBounds()
+    );
+    const [, y] = invisibleWindow.getPosition();
+    const [width] = invisibleWindow.getSize();
+    invisibleWindow.setPosition(workArea.x + workArea.width - width, y);
   });
-
-  globalShortcut.register("CommandOrControl+Right", () => {
-    if (invisibleWindow) {
-      const [x, y] = invisibleWindow.getPosition();
-      invisibleWindow.setPosition(x + NUDGE_AMOUNT, y);
-    }
+  registerShortcut("CommandOrControl+Shift+Up", () =>
+    moveAssistant(-10000, -10000)
+  );
+  registerShortcut("CommandOrControl+Shift+Down", () => {
+    if (!invisibleWindow || invisibleWindow.isDestroyed()) return;
+    const { workArea } = screen.getDisplayMatching(
+      invisibleWindow.getBounds()
+    );
+    const [, height] = invisibleWindow.getSize();
+    invisibleWindow.setPosition(
+      workArea.x,
+      workArea.y + workArea.height - height
+    );
   });
-
-  globalShortcut.register("CommandOrControl+Up", () => {
-    if (invisibleWindow) {
-      const [x, y] = invisibleWindow.getPosition();
-      invisibleWindow.setPosition(x, y - NUDGE_AMOUNT);
-    }
-  });
-
-  globalShortcut.register("CommandOrControl+Down", () => {
-    if (invisibleWindow) {
-      const [x, y] = invisibleWindow.getPosition();
-      invisibleWindow.setPosition(x, y + NUDGE_AMOUNT);
-    }
-  });
-
-  // Snap window to screen edges
-  globalShortcut.register("CommandOrControl+Shift+Left", () => {
-    if (invisibleWindow) {
-      invisibleWindow.setPosition(0, 0);
-    }
-  });
-
-  globalShortcut.register("CommandOrControl+Shift+Right", () => {
-    if (invisibleWindow) {
-      const windowBounds = invisibleWindow.getBounds();
-      invisibleWindow.setPosition(screenBounds.width - windowBounds.width, 0);
-    }
-  });
-
-  globalShortcut.register("CommandOrControl+Shift+Up", () => {
-    if (invisibleWindow) {
-      invisibleWindow.setPosition(0, 0);
-    }
-  });
-
-  globalShortcut.register("CommandOrControl+Shift+Down", () => {
-    if (invisibleWindow) {
-      const windowBounds = invisibleWindow.getBounds();
-      invisibleWindow.setPosition(0, screenBounds.height - windowBounds.height);
-    }
-  });
-
-  // Reset chat shortcut (Command/Ctrl + Shift + R)
-  globalShortcut.register("CommandOrControl+Shift+R", () => {
-    if (invisibleWindow) {
+  registerShortcut("CommandOrControl+Shift+R", () => {
+    if (invisibleWindow && !invisibleWindow.isDestroyed()) {
       invisibleWindow.webContents.send("reset-chat");
     }
   });
-
-  // Chat scrolling shortcuts
-  globalShortcut.register("Alt+Up", () => {
+  registerShortcut("Alt+Up", () => {
     if (invisibleWindow) {
       invisibleWindow.webContents.send("scroll-chat", "up");
     }
   });
-
-  globalShortcut.register("Alt+Down", () => {
+  registerShortcut("Alt+Down", () => {
     if (invisibleWindow) {
       invisibleWindow.webContents.send("scroll-chat", "down");
     }
   });
-
-  // For macOS, also register Option key combinations
-  if (process.platform === "darwin") {
-    globalShortcut.register("Option+Up", () => {
-      if (invisibleWindow) {
-        invisibleWindow.webContents.send("scroll-chat", "up");
-      }
-    });
-
-    globalShortcut.register("Option+Down", () => {
-      if (invisibleWindow) {
-        invisibleWindow.webContents.send("scroll-chat", "down");
-      }
-    });
-  }
 }
 
 // When app is ready
 app.whenReady().then(async () => {
-  // Load API key from config before initializing services
-  const apiKey = config.getOpenAIKey();
-  if (apiKey) {
-    process.env.OPENAI_API_KEY = apiKey;
-  }
-
   createInvisibleWindow();
+  initializeLLMService();
   registerShortcuts();
-  await initializeLLMService();
 
   // Create tray icon for Windows
   if (process.platform === "win32") {
-    tray = new Tray(path.join(__dirname, "../assets/OCTO.png"));
+    tray = new Tray(path.join(app.getAppPath(), "assets", "OCTO.png"));
     const contextMenu = Menu.buildFromTemplate([
       { label: "Show", click: () => invisibleWindow.show() },
       { label: "Hide", click: () => invisibleWindow.hide() },
+      { label: "Settings", click: () => createSettingsWindow() },
       { type: "separator" },
       { label: "Quit", click: () => app.quit() },
     ]);

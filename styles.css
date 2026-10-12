@@ -12,9 +12,8 @@ html {
   overflow: hidden;
   background-color: transparent;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  color: rgba(255, 255, 255, 0.9);
-  -webkit-app-region: drag;
-  pointer-events: none;
+  color: rgba(255, 255, 255, 0.95);
+  -webkit-app-region: no-drag;
 }
 
 /* Main container */
@@ -22,13 +21,13 @@ html {
   position: relative;
   width: 100%;
   height: 100%;
-  background-color: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background-color: rgba(20, 24, 33, 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.16);
   display: flex;
   flex-direction: column;
   margin: 0 auto;
-  pointer-events: none;
   border-radius: 12px;
+  overflow: hidden;
 }
 
 /* Chat container */
@@ -40,6 +39,7 @@ html {
   flex-direction: column;
   gap: 16px;
   scroll-behavior: smooth;
+  min-height: 0;
 }
 
 /* Chat history */
@@ -303,6 +303,10 @@ kbd {
   position: relative;
 }
 
+.typing-indicator.visible {
+  display: block;
+}
+
 .typing-indicator span {
   background: linear-gradient(
     90deg,
@@ -341,12 +345,13 @@ kbd {
 
 .null-state {
   display: flex;
+  flex: 1;
   align-items: center;
   justify-content: center;
-  height: 100%;
+  min-height: 0;
   padding: 2rem;
   text-align: center;
-  color: var(--text-color);
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .null-state-content {
@@ -361,7 +366,7 @@ kbd {
 
 .null-state p {
   margin-bottom: 1.5rem;
-  color: var(--text-color-secondary);
+  color: rgba(255, 255, 255, 0.65);
 }
 
 .shortcuts {
@@ -408,4 +413,58 @@ kbd {
   width: 100%;
   height: 100%;
   object-fit: contain;
+}
+
+.question-form {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  padding: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(10, 13, 19, 0.8);
+  -webkit-app-region: no-drag;
+}
+
+#question-input {
+  flex: 1;
+  min-width: 0;
+  resize: none;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font: inherit;
+  line-height: 1.4;
+  outline: none;
+}
+
+#question-input:focus {
+  border-color: #7da7ff;
+}
+
+#question-input:disabled,
+.question-form button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.question-form button {
+  align-self: flex-end;
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 16px;
+  background: #3978f6;
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.question-form button:hover:not(:disabled) {
+  background: #2864d8;
+}
+
+.message-content a {
+  color: #9bbcff;
 }

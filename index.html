@@ -22,19 +22,19 @@
             <h4>Open Interview Coder</h4>
             <div class="shortcuts">
               <div class="shortcut-item">
-                <kbd>⌘</kbd> + <kbd>⇧</kbd> + <kbd>S</kbd>
+                <kbd>⌘ / Ctrl</kbd> + <kbd>⇧</kbd> + <kbd>S</kbd>
                 <span>Take a screenshot</span>
               </div>
               <div class="shortcut-item">
-                <kbd>⌘</kbd> + <kbd>⇧</kbd> + <kbd>H</kbd>
-                <span>Hide window</span>
+                <kbd>⌘ / Ctrl</kbd> + <kbd>⇧</kbd> + <kbd>H</kbd>
+                <span>Toggle assistant</span>
               </div>
               <div class="shortcut-item">
-                <kbd>⌘</kbd> + <kbd>←/→/↑/↓</kbd>
+                <kbd>⌘ / Ctrl</kbd> + <kbd>←/→/↑/↓</kbd>
                 <span>Move window</span>
               </div>
               <div class="shortcut-item">
-                <kbd>⌘</kbd> + <kbd>,</kbd>
+                <kbd>⌘ / Ctrl</kbd> + <kbd>,</kbd>
                 <span>Open settings</span>
               </div>
             </div>
@@ -44,6 +44,15 @@
         <div id="typing-indicator" class="typing-indicator">
           <span>Building solution...</span>
         </div>
+        <form id="question-form" class="question-form">
+          <textarea
+            id="question-input"
+            rows="2"
+            placeholder="Ask a coding question..."
+            aria-label="Ask a coding question"
+          ></textarea>
+          <button type="submit" aria-label="Send question">Ask</button>
+        </form>
       </div>
     </div>
 

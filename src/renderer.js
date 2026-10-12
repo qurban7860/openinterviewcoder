@@ -1,147 +1,185 @@
-// DOM Elements
 const chatHistory = document.getElementById("chat-history");
 const typingIndicator = document.getElementById("typing-indicator");
+const questionInput = document.getElementById("question-input");
+const questionForm = document.getElementById("question-form");
 
-// Chat state
 let messages = [];
+let pendingRequests = 0;
+const pendingMessageIds = new Set();
 
-// Initialize marked with options
-if (typeof marked === "undefined") {
-  console.error("marked library not loaded");
-} else {
-  marked.setOptions({
-    breaks: true,
-    gfm: true,
-  });
+if (typeof marked !== "undefined") {
+  marked.setOptions({ breaks: true, gfm: true });
 }
 
-// Initialize the UI
-document.addEventListener("DOMContentLoaded", async () => {
-  setupEventListeners();
-});
+document.addEventListener("DOMContentLoaded", setupEventListeners);
 
-// Set up event listeners
 function setupEventListeners() {
-  // Window position update
   window.electronAPI.onWindowPositionChanged((position) => {
     document.body.setAttribute("data-position", position);
   });
-
-  // Handle keyboard shortcuts
   document.addEventListener("keydown", handleKeyboardShortcuts);
-
-  // Handle new screenshots
   window.electronAPI.onScreenshotCaptured(addScreenshotToChat);
-
-  // Handle chat reset
+  window.electronAPI.onAssistantQuestion((prompt) => {
+    questionInput.value = prompt;
+    questionForm.requestSubmit();
+  });
   window.electronAPI.onResetChat(resetChat);
-
-  // Handle response updates
   window.electronAPI.onStreamUpdate(updateMessage);
-
-  // Handle chat scrolling
   window.electronAPI.onScrollChat((direction) => {
     const chatContainer = document.querySelector(".chat-container");
     if (chatContainer) {
-      if (direction === "up") {
-        chatContainer.scrollTop -= 100; // Scroll up by 100px
-      } else if (direction === "down") {
-        chatContainer.scrollTop += 100; // Scroll down by 100px
-      }
+      chatContainer.scrollTop += direction === "up" ? -100 : 100;
     }
   });
+  questionForm.addEventListener("submit", handleQuestion);
 }
 
-// Handle keyboard shortcuts
 function handleKeyboardShortcuts(event) {
-  if (event.target.tagName === "INPUT" || event.target.tagName === "TEXTAREA") {
-    return;
-  }
-
   if (event.key === "Escape") {
     window.electronAPI.hideWindow();
   }
-
-  if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key === "t") {
+  if (
+    (event.metaKey || event.ctrlKey) &&
+    event.shiftKey &&
+    event.key.toLowerCase() === "t"
+  ) {
     event.preventDefault();
-    handleTestResponse("write python code to print 'Hello, world!'");
+    questionInput.value = "Write Python code to print 'Hello, world!'";
+    questionForm.requestSubmit();
   }
 }
 
-// Scroll to bottom of chat
+function getConversationHistory() {
+  return messages
+    .filter(
+      (message) =>
+        (message.type === "user" || message.type === "assistant") &&
+        typeof message.content === "string" &&
+        message.content.trim()
+    )
+    .slice(-10)
+    .map(({ type, content }) => ({
+      role: type === "assistant" ? "assistant" : "user",
+      content,
+    }));
+}
+
+function setRequestPending(pending) {
+  pendingRequests += pending ? 1 : -1;
+  pendingRequests = Math.max(0, pendingRequests);
+  typingIndicator.classList.toggle("visible", pendingRequests > 0);
+  questionInput.disabled = pendingRequests > 0;
+  questionForm.querySelector("button").disabled = pendingRequests > 0;
+}
+
 function scrollToBottom() {
   const chatContainer = document.querySelector(".chat-container");
   if (chatContainer) {
     chatContainer.scrollTop = chatContainer.scrollHeight;
-    // Double-check scroll after a short delay to handle dynamic content
-    setTimeout(() => {
-      chatContainer.scrollTop = chatContainer.scrollHeight;
-    }, 100);
   }
 }
 
-// Update message
 function updateMessage(data) {
-  const { messageId, content, isComplete } = data;
-  console.log("updateMessage called:", {
-    messageId,
-    contentLength: content.length,
-    isComplete,
-  });
-
-  // Find or create message element
-  let messageEl = document.querySelector(`[data-message-id="${messageId}"]`);
+  if (!data || typeof data.messageId !== "string") return;
+  let messageEl = document.querySelector(
+    `[data-message-id="${CSS.escape(data.messageId)}"]`
+  );
   if (!messageEl) {
-    console.log("Creating new message element");
-    messageEl = createMessageElement(messageId);
+    if (!pendingMessageIds.has(data.messageId)) return;
+    messageEl = createMessageElement(data.messageId);
     chatHistory.appendChild(messageEl);
-    // Show typing indicator for new messages
-    typingIndicator.classList.add("visible");
-    console.log("Typing indicator shown");
-    updateNullStateVisibility();
   }
 
-  // Update content
   const contentWrapper = messageEl.querySelector(".message-content");
-  if (contentWrapper) {
-    if (content && typeof content === "string") {
-      contentWrapper.innerHTML = marked.parse(content);
-    } else {
-      contentWrapper.innerHTML = ""; // Clear content if it's null/undefined or not a string
-    }
-    messageEl.style.display = "block"; // Show when content is added
-    scrollToBottom();
+  if (contentWrapper && typeof data.content === "string") {
+    renderMessageContent(contentWrapper, data.content);
+    messageEl.style.display = "block";
   }
-
-  // Handle completion
-  if (isComplete) {
-    console.log("Message complete, hiding typing indicator");
-    typingIndicator.classList.remove("visible");
-
-    // Update the message in the messages array
-    const messageIndex = messages.findIndex((m) => m.messageId === messageId);
-    if (messageIndex !== -1) {
-      messages[messageIndex].content = content;
-      messages[messageIndex].status = "completed";
+  if (data.isComplete) {
+    pendingMessageIds.delete(data.messageId);
+    const message = messages.find(
+      (item) => item.messageId === data.messageId
+    );
+    if (message) {
+      message.content = data.content;
+      message.status = "completed";
     }
   }
+  updateNullStateVisibility();
+  scrollToBottom();
 }
 
-// Create message element
+function renderMessageContent(wrapper, content) {
+  if (typeof marked === "undefined") {
+    wrapper.textContent = content;
+    return;
+  }
+
+  const parsed = new DOMParser().parseFromString(
+    marked.parse(content),
+    "text/html"
+  );
+  const allowedTags = new Set([
+    "A",
+    "BLOCKQUOTE",
+    "BR",
+    "CODE",
+    "DEL",
+    "EM",
+    "H1",
+    "H2",
+    "H3",
+    "H4",
+    "HR",
+    "LI",
+    "OL",
+    "P",
+    "PRE",
+    "STRONG",
+    "UL",
+  ]);
+  const appendSafeNodes = (source, target) => {
+    for (const node of source.childNodes) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        target.appendChild(document.createTextNode(node.textContent));
+      } else if (node.nodeType === Node.ELEMENT_NODE) {
+        if (!allowedTags.has(node.tagName)) {
+          appendSafeNodes(node, target);
+          continue;
+        }
+        const safeElement = document.createElement(node.tagName.toLowerCase());
+        if (node.tagName === "A") {
+          try {
+            const url = new URL(node.getAttribute("href"), location.href);
+            if (["http:", "https:", "mailto:"].includes(url.protocol)) {
+              safeElement.setAttribute("href", url.href);
+              safeElement.setAttribute("rel", "noopener noreferrer");
+            }
+          } catch {
+            // Invalid links remain plain text.
+          }
+        }
+        appendSafeNodes(node, safeElement);
+        target.appendChild(safeElement);
+      }
+    }
+  };
+
+  wrapper.replaceChildren();
+  appendSafeNodes(parsed.body, wrapper);
+}
+
 function createMessageElement(messageId) {
   const messageEl = document.createElement("div");
   messageEl.className = "message assistant";
-  messageEl.setAttribute("data-message-id", messageId);
-  messageEl.style.display = "none"; // Hide initially
+  messageEl.dataset.messageId = messageId;
 
   const contentWrapper = document.createElement("div");
   contentWrapper.className = "message-content markdown-body";
   messageEl.appendChild(contentWrapper);
-
   return messageEl;
 }
 
-// Add error message
 function addErrorMessage(message) {
   const errorEl = document.createElement("div");
   errorEl.className = "message error";
@@ -150,69 +188,119 @@ function addErrorMessage(message) {
   scrollToBottom();
 }
 
-// Add screenshot to chat
 async function addScreenshotToChat(data) {
-  const message = {
+  const screenshotMessage = {
     type: "screenshot",
     timestamp: Date.now(),
     filePath: data.filePath,
   };
+  messages.push(screenshotMessage);
 
-  messages.push(message);
-
-  const messageEl = document.createElement("div");
-  messageEl.className = "message user";
-
-  const img = document.createElement("img");
-  img.src = `file://${data.filePath}`;
-  img.className = "screenshot-thumbnail";
-  img.alt = "Screenshot";
-  img.addEventListener("click", () =>
+  const screenshotEl = document.createElement("div");
+  screenshotEl.className = "message user";
+  const image = document.createElement("img");
+  image.src = window.electronAPI.toFileUrl(data.filePath);
+  image.className = "screenshot-thumbnail";
+  image.alt = "Captured screenshot";
+  image.addEventListener("click", () =>
     window.electronAPI.openFile(data.filePath)
   );
+  screenshotEl.appendChild(image);
+  chatHistory.appendChild(screenshotEl);
 
-  messageEl.appendChild(img);
-  chatHistory.appendChild(messageEl);
-  scrollToBottom();
-
+  const assistantMessage = createPendingAssistantMessage();
+  const history = getConversationHistory();
+  setRequestPending(true);
   try {
-    // Show typing indicator before analyzing screenshot
-    typingIndicator.classList.add("visible");
-    console.log("Showing typing indicator for screenshot analysis");
-
     const result = await window.electronAPI.analyzeScreenshot({
       filePath: data.filePath,
-      history: messages
-        .filter((m) => m.type === "assistant")
-        .map((m) => ({
-          role: "assistant",
-          content: m.content,
-        })),
+      history,
+      messageId: assistantMessage.messageId,
     });
-
-    if (!result.success) {
-      throw new Error(result.error);
-    }
-
-    messages.push({
-      type: "assistant",
-      timestamp: Date.now(),
+    updateMessage({
       messageId: result.messageId,
-      provider: result.provider,
-      model: result.model,
-      content: "",
-      status: "pending",
+      content: result.content,
+      isComplete: true,
     });
   } catch (error) {
-    typingIndicator.classList.remove("visible");
+    removePendingAssistantMessage(assistantMessage);
     addErrorMessage(error.message);
+  } finally {
+    setRequestPending(false);
+  }
+  scrollToBottom();
+}
+
+function createPendingAssistantMessage() {
+  const messageId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const message = {
+    type: "assistant",
+    timestamp: Date.now(),
+    messageId,
+    content: "",
+    status: "pending",
+  };
+  messages.push(message);
+  pendingMessageIds.add(messageId);
+  chatHistory.appendChild(createMessageElement(messageId));
+  updateNullStateVisibility();
+  return message;
+}
+
+function removePendingAssistantMessage(message) {
+  messages = messages.filter((item) => item !== message);
+  pendingMessageIds.delete(message.messageId);
+  const element = document.querySelector(
+    `[data-message-id="${CSS.escape(message.messageId)}"]`
+  );
+  if (element) element.remove();
+  updateNullStateVisibility();
+}
+
+async function handleQuestion(event) {
+  event.preventDefault();
+  const prompt = questionInput.value.trim();
+  if (!prompt || pendingRequests > 0) return;
+
+  questionInput.value = "";
+  const userMessage = {
+    type: "user",
+    timestamp: Date.now(),
+    content: prompt,
+  };
+  messages.push(userMessage);
+  const userMessageEl = document.createElement("div");
+  userMessageEl.className = "message user";
+  userMessageEl.textContent = prompt;
+  chatHistory.appendChild(userMessageEl);
+
+  const assistantMessage = createPendingAssistantMessage();
+  const history = getConversationHistory().slice(0, -1);
+  setRequestPending(true);
+  scrollToBottom();
+  try {
+    const result = await window.electronAPI.testResponse({
+      prompt,
+      history,
+      messageId: assistantMessage.messageId,
+    });
+    updateMessage({
+      messageId: result.messageId,
+      content: result.content,
+      isComplete: true,
+    });
+  } catch (error) {
+    removePendingAssistantMessage(assistantMessage);
+    addErrorMessage(error.message);
+  } finally {
+    setRequestPending(false);
   }
 }
 
-// Reset chat
 function resetChat() {
-  chatHistory.innerHTML = "";
+  chatHistory.replaceChildren();
   messages = [];
+  pendingMessageIds.clear();
   updateNullStateVisibility();
 }
 
@@ -220,71 +308,5 @@ function updateNullStateVisibility() {
   const nullState = document.getElementById("null-state");
   if (nullState) {
     nullState.style.display = messages.length === 0 ? "flex" : "none";
-  }
-}
-
-// Handle test response
-async function handleTestResponse(prompt) {
-  try {
-    // Add user message
-    const userMessage = {
-      type: "user",
-      timestamp: Date.now(),
-      content: prompt,
-    };
-    messages.push(userMessage);
-
-    const userMessageEl = document.createElement("div");
-    userMessageEl.className = "message user";
-    userMessageEl.textContent = prompt;
-    chatHistory.appendChild(userMessageEl);
-
-    // Show typing indicator
-    typingIndicator.classList.add("visible");
-    console.log("Showing typing indicator for new test response");
-
-    // Add assistant message placeholder
-    const messageId = Date.now().toString();
-    const assistantMessage = {
-      type: "assistant",
-      timestamp: Date.now(),
-      messageId,
-      content: "",
-      status: "pending",
-    };
-    messages.push(assistantMessage);
-
-    const assistantMessageEl = createMessageElement(messageId);
-    chatHistory.appendChild(assistantMessageEl);
-    scrollToBottom();
-
-    const result = await window.electronAPI.testResponse(prompt);
-    if (!result.success) {
-      throw new Error(result.error);
-    }
-
-    // Update the message with the response
-    const contentWrapper = assistantMessageEl.querySelector(".message-content");
-    if (contentWrapper) {
-      if (result.content && typeof result.content === "string") {
-        contentWrapper.innerHTML = marked.parse(result.content);
-      } else {
-        contentWrapper.innerHTML = ""; // Clear content if it's null/undefined or not a string
-      }
-      assistantMessageEl.classList.remove("loading");
-      scrollToBottom();
-    }
-
-    // Update the message in the messages array
-    assistantMessage.content = result.content;
-    assistantMessage.status = "completed";
-
-    // Hide typing indicator
-    typingIndicator.classList.remove("visible");
-    console.log("Test response complete, hiding typing indicator");
-  } catch (error) {
-    console.error("Error in handleTestResponse:", error);
-    typingIndicator.classList.remove("visible");
-    addErrorMessage(error.message);
   }
 }

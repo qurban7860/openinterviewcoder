@@ -84,16 +84,15 @@ The built applications will be available in the `dist` directory.
 ## Usage
 
 1. Launch the application
-2. Use the keyboard shortcuts to show/hide the assistant:
+2. Use the keyboard shortcuts to control the assistant:
 
-   - `Cmd/Ctrl + Shift + S`: Take a screenshot
+   - `Cmd/Ctrl + Shift + S`: Capture and analyze a screenshot
    - `Cmd/Ctrl + Shift + H`: Toggle assistant visibility
    - `Cmd/Ctrl + ←/→/↑/↓`: Move the assistant window
    - `Cmd + ,`: Open settings
 
-3. The assistant will appear as an overlay on your screen during screen sharing sessions
-4. Type your questions or requests in the chat interface
-5. The AI will respond with relevant code snippets, explanations, and suggestions
+3. Ask questions in the assistant's chat box; responses include relevant code,
+   explanations, and suggestions.
 
 ## Configuration
 

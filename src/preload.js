@@ -1,4 +1,5 @@
 const { contextBridge, ipcRenderer, shell } = require("electron");
+const { pathToFileURL } = require("url");
 
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
@@ -22,6 +23,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // Screenshot handling
   onScreenshotCaptured: (callback) =>
     ipcRenderer.on("screenshot-captured", (event, value) => callback(value)),
+  onAssistantQuestion: (callback) =>
+    ipcRenderer.on("assistant-question", (event, value) => callback(value)),
   analyzeScreenshot: (data) => ipcRenderer.invoke("analyze-screenshot", data),
   onStreamUpdate: (callback) =>
     ipcRenderer.on("stream-update", (event, value) => callback(value)),
@@ -34,6 +37,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   // File handling
   openFile: (path) => shell.openPath(path),
+  toFileUrl: (path) => pathToFileURL(path).href,
 
   // Chat reset
   onResetChat: (callback) =>
