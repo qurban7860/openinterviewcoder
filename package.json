@@ -8,7 +8,7 @@
     "dev": "electron . --debug",
     "build": "electron-builder",
     "build:mac": "electron-builder --mac",
-    "build:win": "electron-builder --win",
+    "build:win": "electron-builder --win --config.win.signAndEditExecutable=false",
     "build:win:local": "electron-builder --win --config.win.signAndEditExecutable=false",
     "build:linux": "electron-builder --linux"
   },
@@ -32,6 +32,7 @@
     },
     "win": {
       "icon": "assets/OCTO.ico",
+      "signAndEditExecutable": false,
       "target": [
         "nsis"
       ]

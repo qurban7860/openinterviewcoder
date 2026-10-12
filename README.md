@@ -78,8 +78,10 @@ npm run build:mac
 # For Windows
 npm run build:win
 
-# Windows local build when symbolic-link privileges are unavailable.
-# This skips executable signing/resource editing; use build:win for releases.
+# Equivalent direct electron-builder command
+npx electron-builder --win --config.win.signAndEditExecutable=false
+
+# Compatibility alias for older instructions
 npm run build:win:local
 
 # For Linux
@@ -122,12 +124,13 @@ using Google's Interactions API.
 Anthropic requests use Claude Haiku 5.5,
 and OpenAI requests use GPT-4o mini.
 
-Windows release builds use electron-builder's normal executable resource-editing
-workflow. If Windows reports that symbolic-link privileges are unavailable,
-enable Developer Mode or build from an elevated terminal. Configure a
-code-signing certificate separately for signed public releases.
-`npm run build:win:local` is available for local unsigned builds and intentionally
-skips executable resource editing.
+Windows builds disable electron-builder's executable-editing helper because
+that helper requires symbolic-link privileges when extracting on some Windows
+installations. This still creates a working per-user NSIS installer; the
+installer is unsigned. For branded executable metadata or signed public
+distribution, enable Windows Developer Mode (or build from an elevated
+terminal), restore `signAndEditExecutable` to `true`, and configure a
+code-signing certificate.
 
 ## Contributing
 
