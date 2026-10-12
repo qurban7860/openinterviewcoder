@@ -91,22 +91,29 @@ function createOpenAIInput(history, prompt, image) {
   return input;
 }
 
-function createGeminiContents(history, prompt, image) {
-  const contents = history.map((message) => ({
-    role: message.role === "assistant" ? "model" : "user",
-    parts: [{ text: message.content }],
-  }));
-  const parts = [{ text: prompt }];
+function createGeminiInput(history, prompt, image) {
+  const conversation = history
+    .map(
+      (message) =>
+        `${message.role === "assistant" ? "Assistant" : "User"}: ${message.content}`
+    )
+    .join("\n\n");
+  const parts = [
+    {
+      type: "text",
+      text: conversation
+        ? `${conversation}\n\nUser: ${prompt}`
+        : prompt,
+    },
+  ];
   if (image) {
     parts.push({
-      inlineData: {
-        mimeType: "image/png",
-        data: image.toString("base64"),
-      },
+      type: "image",
+      mime_type: "image/png",
+      data: image.toString("base64"),
     });
   }
-  contents.push({ role: "user", parts });
-  return contents;
+  return parts;
 }
 
 function createAnthropicMessages(history, prompt, image) {
@@ -155,20 +162,26 @@ async function callProvider(provider, apiKey, history, prompt, image) {
   }
 
   if (provider === "gemini") {
-    const model = "gemini-2.5-flash";
+    const model = "gemini-3.8-flash";
     const response = await axios.post(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+      "https://generativelanguage.googleapis.com/v1beta/interactions",
       {
-        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-        contents: createGeminiContents(history, prompt, image),
-        generationConfig: { maxOutputTokens: 1200 },
+        model,
+        input: createGeminiInput(history, prompt, image),
+        system_instruction: SYSTEM_PROMPT,
+        store: false,
       },
       { timeout: 60000, headers: { "x-goog-api-key": apiKey } }
     );
-    const text = (response.data.candidates?.[0]?.content?.parts || [])
-      .map((part) => part.text || "")
-      .join("\n")
-      .trim();
+    const text =
+      response.data.output_text ||
+      (response.data.steps || [])
+        .filter((step) => step.type === "model_output")
+        .flatMap((step) => step.content || [])
+        .filter((part) => part.type === "text")
+        .map((part) => part.text || "")
+        .join("\n")
+        .trim();
     return { text, model };
   }
 

@@ -116,7 +116,8 @@ Choose an active provider and manage API keys in the app's Settings:
 
 Provider usage and billing are controlled by the provider. Google's Gemini API
 has a free tier subject to Google's current eligibility, quotas, and terms.
-Gemini requests use Gemini 2.5 Flash, Anthropic requests use Claude Haiku 5.5,
+Gemini requests use Gemini 3.8 Flash through Google's Interactions API,
+Anthropic requests use Claude Haiku 5.5,
 and OpenAI requests use GPT-4o mini.
 
 Windows release builds use electron-builder's normal executable resource-editing
