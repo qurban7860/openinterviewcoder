@@ -4,11 +4,13 @@ An AI-powered coding assistant that helps you during screen sharing sessions. Th
 
 ## Features
 
-- Invisible overlay that appears during screen sharing
+- Floating assistant overlay designed for screen-sharing workflows
 - Real-time AI assistance for coding questions
 - Screenshot analysis capabilities
 - Keyboard shortcuts for quick actions
-- Settings management for API configuration
+- Provider selection for OpenAI, Google Gemini, and Anthropic
+- Encrypted local API-key storage
+- Screenshot analysis with supported vision-capable providers
 
 ## Installation
 
@@ -17,7 +19,7 @@ An AI-powered coding assistant that helps you during screen sharing sessions. Th
 1. Download the latest release for your operating system from the releases page
 2. Install the application
 3. Launch the application
-4. Configure your OpenAI API key in the settings (Settings > API Configuration)
+4. Open Settings and add an API key for OpenAI, Gemini, or Anthropic.
 
 ### For Developers
 
@@ -46,6 +48,7 @@ open-interview-coder/
 ├── assets/                 # Images and icons
 │   ├── icon.iconset/       # macOS icon set
 │   ├── OCTO.png            # Application icon
+│   ├── OCTO.ico            # Windows application icon
 │   └── icon.icns           # macOS icon
 ├── src/                    # Source code
 │   ├── main.js             # Main Electron process
@@ -75,6 +78,10 @@ npm run build:mac
 # For Windows
 npm run build:win
 
+# Windows local build when symbolic-link privileges are unavailable.
+# This skips executable signing/resource editing; use build:win for releases.
+npm run build:win:local
+
 # For Linux
 npm run build:linux
 ```
@@ -88,19 +95,36 @@ The built applications will be available in the `dist` directory.
 
    - `Cmd/Ctrl + Shift + S`: Capture and analyze a screenshot
    - `Cmd/Ctrl + Shift + H`: Toggle assistant visibility
+   - `Cmd/Ctrl + Shift + Q`: Quit the application
    - `Cmd/Ctrl + ←/→/↑/↓`: Move the assistant window
    - `Cmd + ,`: Open settings
 
-3. Ask questions in the assistant's chat box; responses include relevant code,
-   explanations, and suggestions.
+3. Ask questions in the chat box, choose a suggestion, or use the screenshot
+   shortcut. Press Enter to send and Shift+Enter for a new line.
+4. Use the window controls to hide the assistant or quit the application.
 
 ## Configuration
 
-The OpenAI API key can be configured through the app's settings UI:
+Choose an active provider and manage API keys in the app's Settings:
 
-1. Open the settings window (Settings > API Configuration)
-2. Enter your OpenAI API key
-3. Click "Save Changes"
+1. Open Settings with `Cmd/Ctrl + ,` or the gear button.
+2. Select OpenAI, Google Gemini, or Anthropic.
+3. Add the provider's API key and save. Saved keys are encrypted with the
+   operating system's secure credential storage and are never returned to the
+   renderer. Linux requires a working system keyring (such as GNOME Keyring or
+   KWallet) to save new keys.
+
+Provider usage and billing are controlled by the provider. Google's Gemini API
+has a free tier subject to Google's current eligibility, quotas, and terms.
+Gemini requests use Gemini 2.5 Flash, Anthropic requests use Claude Haiku 5.5,
+and OpenAI requests use GPT-4o mini.
+
+Windows release builds use electron-builder's normal executable resource-editing
+workflow. If Windows reports that symbolic-link privileges are unavailable,
+enable Developer Mode or build from an elevated terminal. Configure a
+code-signing certificate separately for signed public releases.
+`npm run build:win:local` is available for local unsigned builds and intentionally
+skips executable resource editing.
 
 ## Contributing
 

@@ -1,110 +1,132 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Settings</title>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Assistant settings</title>
     <style>
-      body {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-          Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
-        margin: 0;
-        padding: 20px;
-        background-color: #ffffff;
+      :root {
+        color-scheme: dark;
+        font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+        background: #0c1018;
+        color: #eef2f8;
       }
-      .settings-container {
-        margin: 0 auto;
-        padding: 20px;
+      * { box-sizing: border-box; }
+      body { margin: 0; min-height: 100vh; padding: 34px 28px; }
+      main { width: min(100%, 620px); margin: 0 auto; }
+      .eyebrow { color: #8ca8ff; font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+      h1 { margin: 10px 0 8px; font-size: 27px; letter-spacing: -.04em; }
+      .intro { margin: 0 0 28px; max-width: 540px; color: #9ba8ba; font-size: 14px; line-height: 1.65; }
+      .section-heading { margin: 24px 0 12px; color: #e0e7f2; font-size: 13px; font-weight: 650; }
+      .provider-card, .key-card { border: 1px solid #252d3a; border-radius: 14px; background: #121823; }
+      .provider-card { padding: 18px; }
+      label { display: block; margin-bottom: 8px; color: #dce4f0; font-size: 13px; font-weight: 600; }
+      select, input {
+        width: 100%; min-height: 42px; padding: 10px 12px; border: 1px solid #313b4b;
+        border-radius: 9px; outline: none; background: #0d131d; color: #f2f5fa; font: inherit;
       }
-      .settings-header {
-        margin-bottom: 30px;
-      }
-      .settings-title {
-        font-size: 20px;
-        font-weight: 500;
-        color: #333;
-        margin: 0;
-      }
-      .settings-section {
-        margin-bottom: 30px;
-      }
-      .section-title {
-        font-size: 16px;
-        font-weight: 500;
-        color: #666;
-        margin-bottom: 15px;
-      }
-      .setting-item {
-        display: flex;
-        align-items: center;
-        margin-bottom: 15px;
-      }
-      .setting-label {
-        flex: 1;
-        font-size: 14px;
-        color: #333;
-      }
-      .setting-control {
-        margin-left: 20px;
-        flex: 2;
-      }
-      input[type="text"] {
-        padding: 8px 12px;
-        border: 1px solid #e0e0e0;
-        border-radius: 4px;
-        font-size: 14px;
-        width: 100%;
-        box-sizing: border-box;
-      }
-      input[type="text"]:focus {
-        outline: none;
-        border-color: #007aff;
-      }
-      .save-button {
-        background-color: #007aff;
-        color: white;
-        border: none;
-        padding: 10px 16px;
-        border-radius: 4px;
-        font-size: 14px;
-        cursor: pointer;
-        width: 100%;
-        margin-top: 20px;
-      }
-      .save-button:hover {
-        background-color: #0056b3;
-      }
-      .api-key-description {
-        font-size: 12px;
-        color: #999;
-        margin-top: 4px;
-      }
+      select:focus, input:focus { border-color: #7795ff; box-shadow: 0 0 0 3px #7795ff24; }
+      .hint, .key-status { color: #8290a4; font-size: 12px; line-height: 1.5; }
+      .provider-card .hint { margin: 9px 0 0; }
+      .key-list { display: grid; gap: 11px; }
+      .key-card { padding: 16px; }
+      .key-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 11px; }
+      .key-top label { margin: 0; }
+      .key-status { color: #79d9b0; }
+      .key-status.empty { color: #8290a4; }
+      .key-entry { display: flex; gap: 8px; }
+      .key-entry input { min-width: 0; }
+      button { border: 1px solid #313b4b; border-radius: 9px; background: #1a2230; color: #e7edf6; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+      button:hover:not(:disabled) { background: #242f42; }
+      button:disabled { opacity: .42; cursor: not-allowed; }
+      .key-action { flex: 0 0 auto; min-width: 72px; padding: 0 11px; }
+      .remove-key { margin-top: 10px; padding: 7px 10px; color: #f0a3a3; }
+      .privacy-note { margin: 18px 0; padding: 13px 14px; border: 1px solid #283243; border-radius: 10px; background: #111925; color: #9eacc0; font-size: 12px; line-height: 1.6; }
+      .footer { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 22px; }
+      #save-status { min-height: 18px; color: #93a2b7; font-size: 12px; }
+      #save-status.error { color: #ff9898; }
+      #saveButton { min-width: 130px; padding: 11px 18px; border-color: #6787f4; background: #4c6fe7; color: white; }
+      #saveButton:hover:not(:disabled) { background: #5a7bf0; }
+      @media (max-width: 480px) { body { padding: 24px 16px; } .footer { align-items: stretch; flex-direction: column; } #saveButton { width: 100%; } }
     </style>
   </head>
   <body>
-    <div class="settings-container">
-      <div class="settings-header">
-        <h1 class="settings-title">Settings</h1>
-      </div>
+    <main>
+      <div class="eyebrow">Open Interview Coder</div>
+      <h1>Assistant settings</h1>
+      <p class="intro">
+        Choose the AI that powers your assistant and manage keys for multiple
+        providers. Keys stay on this device and are encrypted using your
+        operating system's secure credential storage.
+      </p>
 
-      <div class="settings-section">
-        <div class="setting-item">
-          <label class="setting-label" for="openaiKey">OpenAI API Key</label>
-          <div class="setting-control">
-            <input
-              type="password"
-              id="openaiKey"
-              placeholder="Enter your OpenAI API key"
-              autocomplete="off"
-            />
-            <div class="api-key-description">
-              Your API key is stored locally and never sent to any server except
-              OpenAI's API.
-            </div>
-          </div>
+      <section>
+        <h2 class="section-heading">Active provider</h2>
+        <div class="provider-card">
+          <label for="provider">Use responses from</label>
+          <select id="provider">
+            <option value="openai">OpenAI · GPT-4o mini</option>
+            <option value="gemini">Google Gemini · 2.5 Flash</option>
+            <option value="anthropic">Anthropic · Claude Haiku 5.5</option>
+          </select>
+          <p class="hint">Your selected provider is used for both questions and screenshot analysis.</p>
         </div>
-      </div>
+      </section>
 
-      <button class="save-button" id="saveButton">Save</button>
-    </div>
+      <section>
+        <h2 class="section-heading">Provider API keys</h2>
+        <div class="key-list">
+          <article class="key-card">
+            <div class="key-top">
+              <label for="key-openai">OpenAI</label>
+              <span id="status-openai" class="key-status empty">Not configured</span>
+            </div>
+            <div class="key-entry">
+              <input id="key-openai" type="password" autocomplete="off" placeholder="Paste an OpenAI API key" />
+              <button class="key-action reveal-key" type="button" data-input="key-openai" aria-label="Show OpenAI key">Show</button>
+            </div>
+            <button class="remove-key" type="button" data-provider="openai" disabled>Remove saved key</button>
+          </article>
+          <article class="key-card">
+            <div class="key-top">
+              <label for="key-gemini">Google Gemini</label>
+              <span id="status-gemini" class="key-status empty">Not configured</span>
+            </div>
+            <div class="key-entry">
+              <input id="key-gemini" type="password" autocomplete="off" placeholder="Paste a Gemini API key" />
+              <button class="key-action reveal-key" type="button" data-input="key-gemini" aria-label="Show Gemini key">Show</button>
+            </div>
+            <button class="remove-key" type="button" data-provider="gemini" disabled>Remove saved key</button>
+          </article>
+          <article class="key-card">
+            <div class="key-top">
+              <label for="key-anthropic">Anthropic</label>
+              <span id="status-anthropic" class="key-status empty">Not configured</span>
+            </div>
+            <div class="key-entry">
+              <input id="key-anthropic" type="password" autocomplete="off" placeholder="Paste an Anthropic API key" />
+              <button class="key-action reveal-key" type="button" data-input="key-anthropic" aria-label="Show Anthropic key">Show</button>
+            </div>
+            <button class="remove-key" type="button" data-provider="anthropic" disabled>Remove saved key</button>
+          </article>
+        </div>
+      </section>
+
+      <p id="storage-note" class="privacy-note">
+        API usage and billing are managed by each provider. Gemini offers a
+        free-tier API option subject to Google's current availability and
+        limits. Keys are sent only to the provider you select.
+      </p>
+      <div class="footer">
+        <span id="save-status" role="status" aria-live="polite"></span>
+        <button id="saveButton" type="button">Save settings</button>
+      </div>
+    </main>
     <script src="src/settings.js"></script>
   </body>
 </html>

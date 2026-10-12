@@ -4,60 +4,70 @@
     <meta charset="UTF-8" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' file:"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' file: data:"
     />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link href="styles.css" rel="stylesheet" />
-    <title>Invisible Assistant</title>
+    <title>Open Interview Coder</title>
   </head>
   <body>
-    <div id="invisible-container">
-      <!-- Chat area -->
-      <div class="chat-container">
-        <div id="null-state" class="null-state">
-          <div class="null-state-content">
-            <!-- octo logo, with animation -->
-            <div class="octo-logo">
-              <img src="assets/OCTO.png" alt="Octo" />
-            </div>
-            <h4>Open Interview Coder</h4>
-            <div class="shortcuts">
-              <div class="shortcut-item">
-                <kbd>⌘ / Ctrl</kbd> + <kbd>⇧</kbd> + <kbd>S</kbd>
-                <span>Take a screenshot</span>
-              </div>
-              <div class="shortcut-item">
-                <kbd>⌘ / Ctrl</kbd> + <kbd>⇧</kbd> + <kbd>H</kbd>
-                <span>Toggle assistant</span>
-              </div>
-              <div class="shortcut-item">
-                <kbd>⌘ / Ctrl</kbd> + <kbd>←/→/↑/↓</kbd>
-                <span>Move window</span>
-              </div>
-              <div class="shortcut-item">
-                <kbd>⌘ / Ctrl</kbd> + <kbd>,</kbd>
-                <span>Open settings</span>
-              </div>
-            </div>
+    <main id="assistant-window">
+      <header class="app-header">
+        <div class="brand">
+          <img class="brand-mark" src="assets/OCTO.png" alt="" />
+          <div class="brand-copy">
+            <span class="brand-name">Open Interview Coder</span>
+            <span class="brand-caption">Your private coding copilot</span>
           </div>
         </div>
-        <div id="chat-history"></div>
-        <div id="typing-indicator" class="typing-indicator">
-          <span>Building solution...</span>
+        <div class="header-actions">
+          <span id="provider-badge" class="provider-badge">AI assistant</span>
+          <button id="settings-button" class="icon-button" type="button" title="Settings" aria-label="Open settings">⚙</button>
+          <button id="hide-button" class="icon-button" type="button" title="Hide assistant" aria-label="Hide assistant">−</button>
+          <button id="quit-button" class="icon-button close-button" type="button" title="Quit application" aria-label="Quit application">×</button>
         </div>
+      </header>
+
+      <section class="chat-container" aria-label="Assistant conversation">
+        <div id="null-state" class="welcome-state">
+          <div class="welcome-mark"><img src="assets/OCTO.png" alt="" /></div>
+          <span class="welcome-eyebrow">READY WHEN YOU ARE</span>
+          <h1>Think through it together.</h1>
+          <p>Ask a question, paste a problem, or capture your screen for context.</p>
+          <div class="suggestions" aria-label="Suggested questions">
+            <button class="suggestion" type="button" data-question="Explain this concept with a simple example.">Explain a concept <span>↗</span></button>
+            <button class="suggestion" type="button" data-question="Help me solve this coding problem. Ask any essential clarifying questions, then explain the approach and complexity.">Solve a coding problem <span>↗</span></button>
+            <button class="suggestion" type="button" data-question="Review this code for bugs and suggest a clearer or more efficient solution.">Review my code <span>↗</span></button>
+          </div>
+          <div class="shortcut-hint"><kbd class="modifier-key">Ctrl</kbd><span>+</span><kbd>Shift</kbd><span>+</span><kbd>S</kbd><span>to capture your screen</span></div>
+        </div>
+        <div id="chat-history" aria-live="polite"></div>
+        <div id="typing-indicator" class="typing-indicator" aria-live="polite">
+          <span class="typing-dots"><i></i><i></i><i></i></span>
+          <span>Thinking through your question…</span>
+        </div>
+      </section>
+
+      <footer class="composer-area">
         <form id="question-form" class="question-form">
           <textarea
             id="question-input"
             rows="2"
-            placeholder="Ask a coding question..."
+            placeholder="Ask anything about code..."
             aria-label="Ask a coding question"
           ></textarea>
-          <button type="submit" aria-label="Send question">Ask</button>
+          <button type="submit" id="send-button" aria-label="Send question">
+            <span>Send</span><span aria-hidden="true">↑</span>
+          </button>
         </form>
-      </div>
-    </div>
+        <div class="composer-footer">
+          <span><kbd>Enter</kbd> to send <span class="footer-divider">·</span> <kbd>Shift + Enter</kbd> for a new line</span>
+          <button id="clear-chat-button" type="button" title="Clear conversation">Clear chat</button>
+        </div>
+      </footer>
+    </main>
 
-    <!-- Scripts -->
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="node_modules/marked/marked.min.js"></script>
     <script src="src/renderer.js" defer></script>
   </body>
 </html>

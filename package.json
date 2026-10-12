@@ -1,7 +1,7 @@
 {
   "name": "open-interview-coder",
   "version": "0.1.0",
-  "description": "An invisible AI assistant for screen sharing",
+  "description": "A desktop AI coding assistant for screen-sharing workflows",
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
@@ -9,6 +9,7 @@
     "build": "electron-builder",
     "build:mac": "electron-builder --mac",
     "build:win": "electron-builder --win",
+    "build:win:local": "electron-builder --win --config.win.signAndEditExecutable=false",
     "build:linux": "electron-builder --linux"
   },
   "dependencies": {
@@ -30,10 +31,10 @@
       "icon": "assets/icon.icns"
     },
     "win": {
+      "icon": "assets/OCTO.ico",
       "target": [
         "nsis"
-      ],
-      "icon": "assets/OCTO.png"
+      ]
     },
     "linux": {
       "target": [

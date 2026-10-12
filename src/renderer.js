@@ -14,6 +14,9 @@ if (typeof marked !== "undefined") {
 document.addEventListener("DOMContentLoaded", setupEventListeners);
 
 function setupEventListeners() {
+  document.querySelectorAll(".modifier-key").forEach((key) => {
+    if (window.electronAPI.platform === "darwin") key.textContent = "⌘";
+  });
   window.electronAPI.onWindowPositionChanged((position) => {
     document.body.setAttribute("data-position", position);
   });
@@ -25,6 +28,7 @@ function setupEventListeners() {
   });
   window.electronAPI.onResetChat(resetChat);
   window.electronAPI.onStreamUpdate(updateMessage);
+  window.electronAPI.onSettingsUpdated(updateProviderBadge);
   window.electronAPI.onScrollChat((direction) => {
     const chatContainer = document.querySelector(".chat-container");
     if (chatContainer) {
@@ -32,6 +36,50 @@ function setupEventListeners() {
     }
   });
   questionForm.addEventListener("submit", handleQuestion);
+  questionInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      questionForm.requestSubmit();
+    }
+  });
+  document.getElementById("settings-button").addEventListener("click", () => {
+    window.electronAPI.showSettings();
+  });
+  document.getElementById("hide-button").addEventListener("click", () => {
+    window.electronAPI.hideWindow();
+  });
+  document.getElementById("quit-button").addEventListener("click", () => {
+    window.electronAPI.quitApp();
+  });
+  document.getElementById("clear-chat-button").addEventListener("click", () => {
+    resetChat();
+  });
+  document.querySelectorAll(".suggestion").forEach((button) => {
+    button.addEventListener("click", () => {
+      questionInput.value = button.dataset.question;
+      questionForm.requestSubmit();
+    });
+  });
+  window.electronAPI.getSettings().then(updateProviderBadge).catch((error) => {
+    addErrorMessage(`Couldn't load provider settings: ${error.message}`);
+  });
+}
+
+function updateProviderBadge(settings) {
+  const providerNames = {
+    openai: "OpenAI",
+    gemini: "Gemini",
+    anthropic: "Anthropic",
+  };
+  const badge = document.getElementById("provider-badge");
+  badge.textContent = providerNames[settings.provider] || "AI assistant";
+  badge.title = settings.configuredProviders.includes(settings.provider)
+    ? `${badge.textContent} is ready`
+    : "Add an API key in settings to get started";
+  badge.classList.toggle(
+    "provider-unconfigured",
+    !settings.configuredProviders.includes(settings.provider)
+  );
 }
 
 function handleKeyboardShortcuts(event) {
@@ -69,7 +117,7 @@ function setRequestPending(pending) {
   pendingRequests = Math.max(0, pendingRequests);
   typingIndicator.classList.toggle("visible", pendingRequests > 0);
   questionInput.disabled = pendingRequests > 0;
-  questionForm.querySelector("button").disabled = pendingRequests > 0;
+  document.getElementById("send-button").disabled = pendingRequests > 0;
 }
 
 function scrollToBottom() {
@@ -93,7 +141,6 @@ function updateMessage(data) {
   const contentWrapper = messageEl.querySelector(".message-content");
   if (contentWrapper && typeof data.content === "string") {
     renderMessageContent(contentWrapper, data.content);
-    messageEl.style.display = "block";
   }
   if (data.isComplete) {
     pendingMessageIds.delete(data.messageId);
@@ -307,6 +354,6 @@ function resetChat() {
 function updateNullStateVisibility() {
   const nullState = document.getElementById("null-state");
   if (nullState) {
-    nullState.style.display = messages.length === 0 ? "flex" : "none";
+    nullState.classList.toggle("is-hidden", messages.length !== 0);
   }
 }

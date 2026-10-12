@@ -4,6 +4,7 @@ const { pathToFileURL } = require("url");
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld("electronAPI", {
+  platform: process.platform,
   // Get settings
   getSettings: () => ipcRenderer.invoke("get-settings"),
 
@@ -16,6 +17,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // Window controls
   minimizeWindow: () => ipcRenderer.invoke("minimize-window"),
   hideWindow: () => ipcRenderer.invoke("hide-window"),
+  quitApp: () => ipcRenderer.invoke("quit-app"),
 
   // Context menu
   buildContextMenu: () => ipcRenderer.invoke("build-context-menu"),
@@ -25,6 +27,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on("screenshot-captured", (event, value) => callback(value)),
   onAssistantQuestion: (callback) =>
     ipcRenderer.on("assistant-question", (event, value) => callback(value)),
+  onSettingsUpdated: (callback) =>
+    ipcRenderer.on("settings-updated", (event, value) => callback(value)),
   analyzeScreenshot: (data) => ipcRenderer.invoke("analyze-screenshot", data),
   onStreamUpdate: (callback) =>
     ipcRenderer.on("stream-update", (event, value) => callback(value)),

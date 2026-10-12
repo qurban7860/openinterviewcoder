@@ -20,9 +20,7 @@ const config = require("./config");
 
 // IPC handlers for settings
 ipcMain.handle("get-settings", () => {
-  return {
-    openaiKey: config.getOpenAIKey(),
-  };
+  return config.getSettings();
 });
 
 // IPC handler for scrolling chat
@@ -33,11 +31,56 @@ ipcMain.handle("scroll-chat", (event, direction) => {
   return true;
 });
 
-ipcMain.handle("save-settings", async (event, settings) => {
-  if (typeof settings.openaiKey === "string") {
-    config.setOpenAIKey(settings.openaiKey);
+ipcMain.handle("save-settings", (event, settings = {}) => {
+  if (!settings || typeof settings !== "object") {
+    throw new Error("Invalid settings payload.");
   }
-  return true;
+  const apiKeys =
+    settings.apiKeys && typeof settings.apiKeys === "object"
+      ? settings.apiKeys
+      : {};
+  const removeKeys = Array.isArray(settings.removeKeys)
+    ? settings.removeKeys
+    : [];
+
+  if (removeKeys.some((provider) => !config.PROVIDERS.includes(provider))) {
+    throw new Error("Cannot remove an unsupported provider key.");
+  }
+  const provider = settings.provider || config.getSettings().provider;
+  if (!config.PROVIDERS.includes(provider)) {
+    throw new Error("Choose a supported AI provider.");
+  }
+  const providerHasSubmittedKey =
+    typeof apiKeys[provider] === "string" && apiKeys[provider].trim();
+  if (
+    !providerHasSubmittedKey &&
+    removeKeys.includes(provider)
+  ) {
+    throw new Error("Add a replacement key before removing the active provider's key.");
+  }
+  if (
+    !providerHasSubmittedKey &&
+    !removeKeys.includes(provider) &&
+    !config.hasApiKey(provider)
+  ) {
+    throw new Error(`Add a ${provider} API key before selecting this provider.`);
+  }
+
+  for (const provider of config.PROVIDERS) {
+    if (typeof apiKeys[provider] === "string" && apiKeys[provider].trim()) {
+      config.setApiKey(provider, apiKeys[provider].trim());
+    }
+  }
+  for (const provider of removeKeys) {
+    if (!apiKeys[provider]) config.removeApiKey(provider);
+  }
+  config.setProvider(provider);
+
+  const updatedSettings = config.getSettings();
+  if (invisibleWindow && !invisibleWindow.isDestroyed()) {
+    invisibleWindow.webContents.send("settings-updated", updatedSettings);
+  }
+  return updatedSettings;
 });
 
 // IPC handler for settings window visibility
@@ -86,6 +129,11 @@ ipcMain.handle("hide-window", () => {
   if (invisibleWindow) {
     invisibleWindow.hide();
   }
+});
+
+ipcMain.handle("quit-app", () => {
+  app.quit();
+  return true;
 });
 
 let invisibleWindow;
@@ -153,8 +201,8 @@ function createMenuTemplate() {
 
 function createInvisibleWindow() {
   const { workArea } = screen.getPrimaryDisplay();
-  const width = 500;
-  const height = 700;
+  const width = Math.min(460, workArea.width);
+  const height = Math.min(760, workArea.height);
   invisibleWindow = new BrowserWindow({
     width,
     height,
@@ -315,6 +363,7 @@ function moveAssistant(xOffset, yOffset) {
 function registerShortcuts() {
   registerShortcut("CommandOrControl+Shift+S", takeScreenshot);
   registerShortcut("CommandOrControl+Shift+H", toggleAssistantVisibility);
+  registerShortcut("CommandOrControl+Shift+Q", () => app.quit());
   registerShortcut("CommandOrControl+B", toggleAssistantVisibility);
   registerShortcut("CommandOrControl+,", createSettingsWindow);
 
@@ -385,7 +434,12 @@ function registerShortcuts() {
 }
 
 // When app is ready
-app.whenReady().then(async () => {
+app.whenReady().then(() => {
+  try {
+    config.migrateLegacyOpenAIKey();
+  } catch (error) {
+    console.error("Failed to migrate the saved OpenAI key:", error);
+  }
   createInvisibleWindow();
   initializeLLMService();
   registerShortcuts();
