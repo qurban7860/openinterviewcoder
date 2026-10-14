@@ -7,7 +7,6 @@ An AI-powered coding assistant that helps you during screen sharing sessions. Th
 - Floating assistant overlay designed for screen-sharing workflows
 - Real-time AI assistance for coding questions
 - Screenshot analysis capabilities
-- Keyboard shortcuts for quick actions
 - Provider selection for OpenAI, Google Gemini, and Anthropic
 - Encrypted local API-key storage
 - Screenshot analysis with supported vision-capable providers
