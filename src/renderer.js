@@ -480,12 +480,14 @@ async function addScreenshotToChat(data) {
 
   const assistantMessage = createPendingAssistantMessage();
   const history = getConversationHistory();
+  const activeSession = await window.electronAPI.getActiveSession();
   setRequestPending(true);
   try {
     const result = await window.electronAPI.analyzeScreenshot({
       filePath: data.filePath,
       history,
       messageId: assistantMessage.messageId,
+      session: activeSession || null,
     });
     updateMessage({
       messageId: result.messageId,
@@ -546,6 +548,7 @@ async function handleQuestion(event) {
 
   const assistantMessage = createPendingAssistantMessage();
   const history = getConversationHistory().slice(0, -1);
+  const activeSession = await window.electronAPI.getActiveSession();
   setRequestPending(true);
   scrollToBottom();
   try {
@@ -553,6 +556,7 @@ async function handleQuestion(event) {
       prompt,
       history,
       messageId: assistantMessage.messageId,
+      session: activeSession || null,
     });
     updateMessage({
       messageId: result.messageId,

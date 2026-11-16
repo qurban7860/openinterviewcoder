@@ -4,6 +4,10 @@ const fs = require("fs");
 const path = require("path");
 const { randomUUID } = require("crypto");
 const config = require("./config");
+const {
+  buildInterviewSystemPrompt,
+  buildInterviewUserMessage,
+} = require("./interview-orchestration");
 
 const SYSTEM_PROMPT = `You are an interview coding assistant. Answer the user's question directly and accurately.
 For coding problems, explain the approach briefly, then provide a correct, readable solution and its complexity when useful. Ask a clarifying question only when essential. Keep responses concise and use Markdown.`;
@@ -141,13 +145,13 @@ function createAnthropicMessages(history, prompt, image) {
   return messages;
 }
 
-async function callProvider(provider, apiKey, history, prompt, image) {
+async function callProvider(provider, apiKey, history, prompt, image, interviewSystemPrompt = SYSTEM_PROMPT) {
   if (provider === "openai") {
     const response = await axios.post(
       "https://api.openai.com/v1/responses",
       {
         model: "gpt-4o-mini",
-        instructions: SYSTEM_PROMPT,
+        instructions: `${SYSTEM_PROMPT} ${interviewSystemPrompt}`,
         input: createOpenAIInput(history, prompt, image),
         max_output_tokens: 1200,
       },
@@ -175,7 +179,7 @@ async function callProvider(provider, apiKey, history, prompt, image) {
           {
             model,
             input: createGeminiInput(history, prompt, image),
-            system_instruction: SYSTEM_PROMPT,
+            system_instruction: `${SYSTEM_PROMPT} ${interviewSystemPrompt}`,
             store: false,
           },
           { timeout: 60000, headers: { "x-goog-api-key": apiKey } }
@@ -228,7 +232,7 @@ async function callProvider(provider, apiKey, history, prompt, image) {
       "https://api.anthropic.com/v1/messages",
       {
         model,
-        system: SYSTEM_PROMPT,
+        system: `${SYSTEM_PROMPT} ${interviewSystemPrompt}`,
         messages: createAnthropicMessages(history, prompt, image),
         max_tokens: 1200,
       },
@@ -261,6 +265,7 @@ async function makeLLMRequest(event, data = {}) {
     );
   }
 
+  const session = data.session || {};
   const prompt =
     typeof data.prompt === "string" && data.prompt.trim()
       ? data.prompt.trim()
@@ -272,13 +277,16 @@ async function makeLLMRequest(event, data = {}) {
   const image = data.filePath ? await readScreenshot(data.filePath) : null;
   const history = getHistory(data);
   const messageId = data.messageId || randomUUID();
+  const interviewSystemPrompt = buildInterviewSystemPrompt(session);
+  const enrichedPrompt = buildInterviewUserMessage({ prompt, session });
   try {
     const { text, model } = await callProvider(
       provider,
       apiKey,
       history,
-      prompt,
-      image
+      enrichedPrompt,
+      image,
+      interviewSystemPrompt
     );
     if (!text) {
       throw new Error("The assistant returned an empty response.");
