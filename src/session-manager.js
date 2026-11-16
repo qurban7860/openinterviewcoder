@@ -80,6 +80,31 @@ function appendMessage(sessionId, message) {
   return entry;
 }
 
+function updateSessionMeta(sessionId, updates = {}) {
+  const session = sessions.get(sessionId);
+  if (!session) {
+    throw new Error('Unable to find that session.');
+  }
+
+  const next = {
+    ...session,
+    ...updates,
+    mode: normalizeMode(updates.mode || session.mode || 'general'),
+    updatedAt: new Date().toISOString(),
+  };
+
+  if (typeof updates.name === 'string' && updates.name.trim()) {
+    next.name = updates.name.trim();
+  }
+  if (typeof updates.role === 'string') next.role = updates.role.trim();
+  if (typeof updates.company === 'string') next.company = updates.company.trim();
+  if (typeof updates.description === 'string') next.description = updates.description.trim();
+  if (typeof updates.interviewType === 'string') next.interviewType = updates.interviewType.trim();
+
+  sessions.set(sessionId, next);
+  return next;
+}
+
 function getSessionContext(session, limit = 10) {
   const source = session && Array.isArray(session.messages) ? session.messages : [];
   const bounded = source.slice(-limit);
@@ -112,4 +137,5 @@ module.exports = {
   getSessionContext,
   listSessions,
   setActiveSession,
+  updateSessionMeta,
 };

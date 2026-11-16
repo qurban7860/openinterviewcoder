@@ -17,7 +17,13 @@ const {
 } = require("./screenshot");
 const { initializeLLMService } = require("./llm-service");
 const config = require("./config");
-const { createSession, getActiveSession, listSessions, setActiveSession } = require("./session-manager");
+const {
+  createSession,
+  getActiveSession,
+  listSessions,
+  setActiveSession,
+  updateSessionMeta,
+} = require("./session-manager");
 
 // IPC handlers for settings
 ipcMain.handle("get-settings", () => {
@@ -117,6 +123,11 @@ ipcMain.handle("set-active-session", (_event, sessionId) => {
 });
 
 ipcMain.handle("get-active-session", () => getActiveSession());
+
+ipcMain.handle("update-session-meta", (_event, sessionId, updates = {}) => {
+  if (!sessionId) return getActiveSession();
+  return updateSessionMeta(sessionId, updates);
+});
 
 // IPC handler for context menu
 ipcMain.handle("build-context-menu", (event) => {

@@ -46,6 +46,19 @@
       button:disabled { opacity: .42; cursor: not-allowed; }
       .key-action { flex: 0 0 auto; min-width: 72px; padding: 0 11px; }
       .remove-key { margin-top: 10px; padding: 7px 10px; color: #f0a3a3; }
+      .capability-matrix { display: grid; gap: 10px; margin-top: 12px; }
+      .capability-card {
+        padding: 14px 16px; border: 1px solid #252d3a; border-radius: 12px;
+        background: #121823; display: grid; gap: 8px;
+      }
+      .capability-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+      .capability-name { font-weight: 700; color: #edf2ff; }
+      .capability-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+      .capability-tag {
+        padding: 4px 7px; border-radius: 999px; font-size: 10px; font-weight: 700;
+        color: #dfe8ff; background: rgba(92, 118, 201, 0.12); border: 1px solid rgba(126, 150, 224, 0.2);
+      }
+      .capability-tag.off { background: rgba(255,255,255,0.03); color: #93a0b5; border-color: rgba(164,182,206,0.15); }
       .privacy-note { margin: 18px 0; padding: 13px 14px; border: 1px solid #283243; border-radius: 10px; background: #111925; color: #9eacc0; font-size: 12px; line-height: 1.6; }
       .footer { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 22px; }
       #save-status { min-height: 18px; color: #93a2b7; font-size: 12px; }
@@ -115,6 +128,11 @@
             <button class="remove-key" type="button" data-provider="anthropic" disabled>Remove saved key</button>
           </article>
         </div>
+      </section>
+
+      <section>
+        <h2 class="section-heading">Capability overview</h2>
+        <div id="capability-matrix" class="capability-matrix" aria-live="polite"></div>
       </section>
 
       <p id="storage-note" class="privacy-note">

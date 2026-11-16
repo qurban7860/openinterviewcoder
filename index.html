@@ -57,6 +57,31 @@
         </div>
         <button id="new-session-button" class="session-button" type="button">New session</button>
       </header>
+      <section class="session-config" aria-label="Interview session metadata">
+        <div class="session-field">
+          <label for="session-name-input">Name</label>
+          <input id="session-name-input" type="text" placeholder="Frontend round" />
+        </div>
+        <div class="session-field">
+          <label for="session-role-input">Role</label>
+          <input id="session-role-input" type="text" placeholder="Frontend Engineer" />
+        </div>
+        <div class="session-field">
+          <label for="session-company-input">Company</label>
+          <input id="session-company-input" type="text" placeholder="Acme Inc" />
+        </div>
+        <div class="session-field">
+          <label for="session-mode-input">Mode</label>
+          <select id="session-mode-input">
+            <option value="general">General</option>
+            <option value="coding-interview">Coding interview</option>
+            <option value="system-design">System design</option>
+            <option value="behavioral">Behavioral</option>
+            <option value="project-discussion">Project discussion</option>
+          </select>
+        </div>
+        <button id="save-session-meta" class="save-session-button" type="button">Save session details</button>
+      </section>
       <footer class="composer-area">
         <form id="question-form" class="question-form">
           <textarea

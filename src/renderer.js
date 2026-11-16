@@ -9,6 +9,11 @@ const transcriptApplyButton = document.getElementById("transcript-apply-button")
 const micStatus = document.getElementById("mic-status");
 const sessionSelect = document.getElementById("session-select");
 const newSessionButton = document.getElementById("new-session-button");
+const sessionNameInput = document.getElementById("session-name-input");
+const sessionRoleInput = document.getElementById("session-role-input");
+const sessionCompanyInput = document.getElementById("session-company-input");
+const sessionModeInput = document.getElementById("session-mode-input");
+const saveSessionMetaButton = document.getElementById("save-session-meta");
 
 let messages = [];
 let pendingRequests = 0;
@@ -81,11 +86,13 @@ function setupEventListeners() {
   });
 
   newSessionButton.addEventListener("click", createSessionFromUI);
+  saveSessionMetaButton.addEventListener("click", saveSessionMeta);
   sessionSelect.addEventListener("change", async (event) => {
     const selectedId = event.target.value;
     if (!selectedId) return;
     const session = await window.electronAPI.setActiveSession(selectedId);
     activeSessionId = session && session.id ? session.id : null;
+    syncSessionForm();
     renderSessionMessages();
   });
   document.querySelectorAll(".suggestion").forEach((button) => {
@@ -123,6 +130,32 @@ function renderSessionOptions(sessions = []) {
   sessionSelect.innerHTML = items.map((session) => (
     `<option value="${session.id}" ${session.id === activeSessionId ? 'selected' : ''}>${session.name}</option>`
   )).join('');
+}
+
+function syncSessionForm() {
+  if (!activeSessionId) return;
+  const currentSession = window.electronAPI.getActiveSession ? window.electronAPI.getActiveSession() : null;
+  if (!currentSession) return;
+  sessionNameInput.value = currentSession.name || '';
+  sessionRoleInput.value = currentSession.role || '';
+  sessionCompanyInput.value = currentSession.company || '';
+  sessionModeInput.value = currentSession.mode || 'general';
+}
+
+async function saveSessionMeta() {
+  if (!activeSessionId) return;
+  const updates = {
+    name: sessionNameInput.value.trim(),
+    role: sessionRoleInput.value.trim(),
+    company: sessionCompanyInput.value.trim(),
+    mode: sessionModeInput.value,
+  };
+
+  const updatedSession = await window.electronAPI.updateSessionMeta(activeSessionId, updates);
+  if (!updatedSession) return;
+  const sessions = await window.electronAPI.listSessions();
+  renderSessionOptions(sessions);
+  syncSessionForm();
 }
 
 async function createSessionFromUI() {

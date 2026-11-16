@@ -7,6 +7,8 @@ const pendingRemovals = new Set();
 document.addEventListener("DOMContentLoaded", initializeSettings);
 
 async function initializeSettings() {
+  renderCapabilityMatrix();
+
   document.querySelectorAll(".reveal-key").forEach((button) => {
     button.addEventListener("click", () => {
       const input = document.getElementById(button.dataset.input);
@@ -126,6 +128,41 @@ async function saveSettings() {
   } finally {
     saveButton.disabled = false;
   }
+}
+
+function renderCapabilityMatrix() {
+  const capabilityContainer = document.getElementById("capability-matrix");
+  if (!capabilityContainer) return;
+
+  const providerCapabilities = {
+    openai: { label: "OpenAI", text: "Text", vision: "Vision", streaming: "Streaming", transcription: "Transcription" },
+    gemini: { label: "Gemini", text: "Text", vision: "Vision", streaming: "Streaming", transcription: "Transcription" },
+    anthropic: { label: "Anthropic", text: "Text", vision: "Vision", streaming: "Streaming", transcription: "Transcription" },
+  };
+
+  const providerData = {
+    openai: { text: true, vision: true, streaming: true, transcription: false },
+    gemini: { text: true, vision: true, streaming: true, transcription: true },
+    anthropic: { text: true, vision: true, streaming: true, transcription: false },
+  };
+
+  capabilityContainer.innerHTML = Object.entries(providerData)
+    .map(([key, values]) => {
+      const capabilityList = Object.entries(providerCapabilities[key]).map(([capabilityKey, label]) => {
+        const isEnabled = values[capabilityKey];
+        return `<span class="capability-tag ${isEnabled ? "" : "off"}">${isEnabled ? label : `${label} off`}</span>`;
+      }).join("");
+
+      return `
+        <article class="capability-card">
+          <div class="capability-header">
+            <span class="capability-name">${providerCapabilities[key].label}</span>
+          </div>
+          <div class="capability-tags">${capabilityList}</div>
+        </article>
+      `;
+    })
+    .join("");
 }
 
 function setStatus(message, isError = false) {
