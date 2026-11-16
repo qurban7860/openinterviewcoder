@@ -2,10 +2,19 @@ const chatHistory = document.getElementById("chat-history");
 const typingIndicator = document.getElementById("typing-indicator");
 const questionInput = document.getElementById("question-input");
 const questionForm = document.getElementById("question-form");
+const micDeviceSelect = document.getElementById("mic-device-select");
+const startListeningButton = document.getElementById("start-listening");
+const stopListeningButton = document.getElementById("stop-listening");
+const transcriptApplyButton = document.getElementById("transcript-apply-button");
+const micStatus = document.getElementById("mic-status");
 
 let messages = [];
 let pendingRequests = 0;
 const pendingMessageIds = new Set();
+let speechRecognition = null;
+let transcriptBuffer = "";
+let listening = false;
+let activeMicStream = null;
 
 if (typeof marked !== "undefined") {
   marked.setOptions({ breaks: true, gfm: true });
@@ -54,15 +63,161 @@ function setupEventListeners() {
   document.getElementById("clear-chat-button").addEventListener("click", () => {
     resetChat();
   });
+  startListeningButton.addEventListener("click", startListening);
+  stopListeningButton.addEventListener("click", stopListening);
+  transcriptApplyButton.addEventListener("click", () => {
+    const transcript = transcriptBuffer.trim();
+    if (!transcript) {
+      addErrorMessage("No microphone transcript is ready to send yet.");
+      return;
+    }
+    questionInput.value = transcript;
+    questionForm.requestSubmit();
+    transcriptBuffer = "";
+    updateMicStatus("Transcript sent");
+  });
   document.querySelectorAll(".suggestion").forEach((button) => {
     button.addEventListener("click", () => {
       questionInput.value = button.dataset.question;
       questionForm.requestSubmit();
     });
   });
+  populateMicrophoneDevices();
   window.electronAPI.getSettings().then(updateProviderBadge).catch((error) => {
     addErrorMessage(`Couldn't load provider settings: ${error.message}`);
   });
+}
+
+async function populateMicrophoneDevices() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+    updateMicStatus("Microphone access unavailable in this browser");
+    return;
+  }
+
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const audioInputs = devices.filter((device) => device.kind === "audioinput");
+    if (!audioInputs.length) {
+      micDeviceSelect.innerHTML = '<option value="">No microphone detected</option>';
+      updateMicStatus("No microphone detected");
+      return;
+    }
+
+    micDeviceSelect.innerHTML = audioInputs
+      .map(
+        (device, index) =>
+          `<option value="${device.deviceId || index}">${device.label || `Microphone ${index + 1}`}</option>`
+      )
+      .join("");
+    updateMicStatus("Microphone ready");
+  } catch (error) {
+    updateMicStatus("Microphone access unavailable");
+    console.error("Unable to enumerate microphone devices:", error);
+  }
+}
+
+function updateMicStatus(message) {
+  if (!micStatus) return;
+  micStatus.textContent = message;
+  micStatus.style.color = listening ? "#8be0b7" : "#8a96ad";
+}
+
+async function startListening() {
+  const SpeechRecognitionAPI =
+    window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognitionAPI) {
+    updateMicStatus("Speech recognition is not supported in this browser");
+    addErrorMessage("Speech recognition is not available in this environment. You can still type your question manually.");
+    return;
+  }
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    addErrorMessage("Microphone access is not available. Check your browser or OS permission settings.");
+    return;
+  }
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        deviceId: micDeviceSelect.value ? { exact: micDeviceSelect.value } : undefined,
+      },
+    });
+    activeMicStream = stream;
+    listening = true;
+    transcriptBuffer = questionInput.value.trim();
+    updateMicStatus("Listening…");
+
+    if (speechRecognition) {
+      try {
+        speechRecognition.stop();
+      } catch (error) {
+        // Recognition may already be stopped.
+      }
+    }
+
+    speechRecognition = new SpeechRecognitionAPI();
+    speechRecognition.continuous = true;
+    speechRecognition.interimResults = true;
+    speechRecognition.lang = "en-US";
+
+    speechRecognition.onresult = (event) => {
+      let latestTranscript = "";
+      for (let index = event.resultIndex; index < event.results.length; index += 1) {
+        const resultItem = event.results[index];
+        latestTranscript += resultItem[0].transcript;
+        if (resultItem.isFinal) {
+          transcriptBuffer = `${transcriptBuffer} ${latestTranscript}`.trim();
+          questionInput.value = transcriptBuffer;
+          updateMicStatus("Transcript ready");
+        }
+      }
+      if (!latestTranscript.trim()) return;
+      questionInput.value = `${transcriptBuffer} ${latestTranscript}`.trim();
+    };
+
+    speechRecognition.onerror = (event) => {
+      const detail = event.error || "speech recognition failed";
+      updateMicStatus(`Microphone error: ${detail}`);
+      if (detail === "not-allowed" || detail === "service-not-allowed") {
+        addErrorMessage("Microphone permission was denied. Allow microphone access in your OS/browser settings and try again.");
+      }
+    };
+
+    speechRecognition.onend = () => {
+      if (!listening) return;
+      try {
+        speechRecognition.start();
+      } catch (error) {
+        updateMicStatus("Microphone listener restarted");
+      }
+    };
+
+    speechRecognition.start();
+  } catch (error) {
+    listening = false;
+    if (activeMicStream) {
+      activeMicStream.getTracks().forEach((track) => track.stop());
+      activeMicStream = null;
+    }
+    updateMicStatus("Microphone permission denied");
+    addErrorMessage(`Microphone access failed: ${error.message}`);
+  }
+}
+
+function stopListening() {
+  listening = false;
+  if (speechRecognition) {
+    try {
+      speechRecognition.stop();
+    } catch (error) {
+      // Ignore stop errors while the recognition engine is already closing.
+    }
+  }
+  if (activeMicStream) {
+    activeMicStream.getTracks().forEach((track) => track.stop());
+    activeMicStream = null;
+  }
+  updateMicStatus("Microphone off");
 }
 
 function updateProviderBadge(settings) {

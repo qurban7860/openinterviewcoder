@@ -60,6 +60,16 @@
             <span>Send</span><span aria-hidden="true">↑</span>
           </button>
         </form>
+        <div class="audio-tools" aria-label="Microphone controls">
+          <label for="mic-device-select" class="mic-label">Mic</label>
+          <select id="mic-device-select" class="mic-device-select">
+            <option value="">Detecting microphones…</option>
+          </select>
+          <button id="start-listening" type="button" class="microphone-button">Listen</button>
+          <button id="stop-listening" type="button" class="microphone-button secondary-button">Stop</button>
+          <button id="transcript-apply-button" type="button" class="microphone-button secondary-button">Use transcript</button>
+          <span id="mic-status" class="mic-status">Microphone off</span>
+        </div>
         <div class="composer-footer">
           <span><kbd>Enter</kbd> to send <span class="footer-divider">·</span> <kbd>Shift + Enter</kbd> for a new line</span>
           <button id="clear-chat-button" type="button" title="Clear conversation">Clear chat</button>

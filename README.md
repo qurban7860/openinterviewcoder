@@ -5,11 +5,14 @@ An AI-powered coding assistant that helps you during screen sharing sessions. Th
 ## Features
 
 - Floating assistant overlay designed for screen-sharing workflows
-- Real-time AI assistance for coding questions
-- Screenshot analysis capabilities
+- Real-time AI assistance for coding questions and interview prep
+- Text-only assistant responses in the chat window
+- Microphone listening with browser-based speech recognition for question capture
+- Screenshot analysis capabilities for supported vision-capable models
 - Provider selection for OpenAI, Google Gemini, and Anthropic
 - Encrypted local API-key storage
-- Screenshot analysis with supported vision-capable providers
+- Provider capability awareness for text, vision, streaming, and transcription support
+- Production-safe Electron defaults with secure IPC and OS keychain support
 
 ## Installation
 
@@ -38,6 +41,16 @@ An AI-powered coding assistant that helps you during screen sharing sessions. Th
 3. Start the development server:
    ```bash
    npm run dev
+   ```
+
+4. Run the test suite:
+   ```bash
+   npm test
+   ```
+
+5. Build the Windows installer:
+   ```bash
+   npm run build:win
    ```
 
 ## Project Structure
@@ -92,7 +105,9 @@ The built applications will be available in the `dist` directory.
 ## Usage
 
 1. Launch the application
-2. Use the keyboard shortcuts to control the assistant:
+2. Select a microphone in the chat composer and click Listen to capture interviewer audio or your own spoken question.
+3. When a transcript appears, review it and click Use transcript to send it into the chat.
+4. Use the keyboard shortcuts to control the assistant:
 
    - `Cmd/Ctrl + Shift + S`: Capture and analyze a screenshot
    - `Cmd/Ctrl + Shift + H`: Toggle assistant visibility
@@ -123,6 +138,11 @@ using Google's Interactions API.
 Anthropic requests use Claude Haiku 5.5,
 and OpenAI requests use GPT-4o mini.
 
+The app currently supports text-only responses in chat, with microphone capture
+implemented as an input workflow instead of spoken playback. Speech recognition
+uses the browser's Web Speech API when available, and the app never emits an
+audio response by default.
+
 Windows builds disable electron-builder's executable-editing helper because
 that helper requires symbolic-link privileges when extracting on some Windows
 installations. This still creates a working per-user NSIS installer; the
@@ -130,6 +150,16 @@ installer is unsigned. For branded executable metadata or signed public
 distribution, enable Windows Developer Mode (or build from an elevated
 terminal), restore `signAndEditExecutable` to `true`, and configure a
 code-signing certificate.
+
+## Capability matrix
+
+| Capability | OpenAI | Gemini | Anthropic |
+| --- | --- | --- | --- |
+| Text generation | ✅ | ✅ | ✅ |
+| Streaming responses | ✅ | ✅ | ✅ |
+| Vision / screenshot analysis | ✅ | ✅ | ✅ |
+| Browser transcription | ⚠️ via local speech API | ⚠️ via local speech API | ⚠️ via local speech API |
+| Default model | GPT-4o mini | Gemini 2.5 Flash Lite | Claude Haiku 5.5 |
 
 ## Contributing
 

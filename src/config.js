@@ -1,7 +1,8 @@
 const Store = require("electron-store");
 const { safeStorage } = require("electron");
+const { getDefaultProvider, PROVIDER_CAPABILITIES } = require("./provider-capabilities");
 
-const PROVIDERS = ["openai", "gemini", "anthropic"];
+const PROVIDERS = Object.keys(PROVIDER_CAPABILITIES);
 const store = new Store({
   defaults: {
     ai: {
@@ -101,10 +102,12 @@ function setProvider(provider) {
 }
 
 function getSettings() {
+  const provider = store.get("ai.provider", getDefaultProvider());
   return {
-    provider: store.get("ai.provider", "openai"),
+    provider: PROVIDERS.includes(provider) ? provider : getDefaultProvider(),
     configuredProviders: PROVIDERS.filter(hasApiKey),
     secureStorageAvailable: isSecureStorageAvailable(),
+    capabilities: PROVIDER_CAPABILITIES,
   };
 }
 
