@@ -72,6 +72,27 @@ button {
   background: rgba(19, 25, 36, 0.8);
 }
 
+.toolbar-row {
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px 15px 0;
+}
+
+.upload-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid rgba(139, 162, 232, 0.26);
+  border-radius: 8px;
+  background: rgba(103, 136, 228, 0.18);
+  color: #dfe7ff;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 700;
+}
+
 .session-config {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

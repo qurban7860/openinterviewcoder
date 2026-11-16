@@ -5,6 +5,18 @@ const path = require("path");
 // Maximum number of screenshots to keep
 const MAX_SCREENSHOTS = 20;
 
+function buildScreenshotFileName(originalName = "upload.png") {
+  const safeBase = (originalName || "upload.png")
+    .trim()
+    .replace(/\.[^/.]+$/, "")
+    .replace(/[^a-zA-Z0-9_-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "") || "upload";
+  const extension = (originalName || "upload.png").match(/\.[^/.]+$/)?.[0] || ".png";
+  const timestamp = Date.now().toString(36);
+  return `screenshot-${safeBase}-${timestamp}${extension}`;
+}
+
 // Checks and optionally guides user to grant macOS screen recording permission
 async function ensureScreenRecordingPermission() {
   if (process.platform !== "darwin") return true; // Only needed on macOS
@@ -95,6 +107,15 @@ function getRecentScreenshots(limit = 5) {
   }
 }
 
+async function saveUploadedScreenshot(fileName, buffer) {
+  const screenshotsDir = ensureScreenshotsDirectory();
+  const safeFileName = buildScreenshotFileName(fileName);
+  const filePath = path.join(screenshotsDir, safeFileName);
+  fs.writeFileSync(filePath, buffer);
+  cleanupOldScreenshots();
+  return filePath;
+}
+
 // Captures a full-screen screenshot and saves it to the app's data directory
 async function captureFullScreen(desktopCapturer, screen) {
   const { width, height } = screen.getPrimaryDisplay().size;
@@ -126,9 +147,11 @@ async function captureFullScreen(desktopCapturer, screen) {
 }
 
 module.exports = {
+  buildScreenshotFileName,
   ensureScreenRecordingPermission,
   captureFullScreen,
   getRecentScreenshots,
   cleanupOldScreenshots,
   ensureScreenshotsDirectory,
+  saveUploadedScreenshot,
 };

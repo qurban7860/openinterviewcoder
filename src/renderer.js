@@ -14,6 +14,7 @@ const sessionRoleInput = document.getElementById("session-role-input");
 const sessionCompanyInput = document.getElementById("session-company-input");
 const sessionModeInput = document.getElementById("session-mode-input");
 const saveSessionMetaButton = document.getElementById("save-session-meta");
+const manualScreenshotUpload = document.getElementById("manual-screenshot-upload");
 
 let messages = [];
 let pendingRequests = 0;
@@ -87,6 +88,7 @@ function setupEventListeners() {
 
   newSessionButton.addEventListener("click", createSessionFromUI);
   saveSessionMetaButton.addEventListener("click", saveSessionMeta);
+  manualScreenshotUpload.addEventListener("change", handleManualScreenshotUpload);
   sessionSelect.addEventListener("change", async (event) => {
     const selectedId = event.target.value;
     if (!selectedId) return;
@@ -167,7 +169,61 @@ async function createSessionFromUI() {
   activeSessionId = session.id;
   const sessions = await window.electronAPI.listSessions();
   renderSessionOptions(sessions);
+  syncSessionForm();
   resetChat();
+}
+
+async function handleManualScreenshotUpload(event) {
+  const [file] = event.target.files || [];
+  if (!file) return;
+
+  const buffer = await file.arrayBuffer();
+  const savedPath = await window.electronAPI.saveUploadedScreenshot({
+    fileName: file.name,
+    buffer: Buffer.from(buffer),
+  });
+
+  const screenshotMessage = {
+    type: 'screenshot',
+    timestamp: Date.now(),
+    filePath: savedPath,
+  };
+
+  messages.push(screenshotMessage);
+  const screenshotEl = document.createElement('div');
+  screenshotEl.className = 'message user';
+  const image = document.createElement('img');
+  image.src = window.electronAPI.toFileUrl(savedPath);
+  image.className = 'screenshot-thumbnail';
+  image.alt = 'Uploaded screenshot';
+  image.addEventListener('click', () => window.electronAPI.openFile(savedPath));
+  screenshotEl.appendChild(image);
+  chatHistory.appendChild(screenshotEl);
+
+  const assistantMessage = createPendingAssistantMessage();
+  const history = getConversationHistory();
+  const activeSession = await window.electronAPI.getActiveSession();
+  setRequestPending(true);
+  try {
+    const result = await window.electronAPI.analyzeScreenshot({
+      filePath: savedPath,
+      history,
+      messageId: assistantMessage.messageId,
+      session: activeSession || null,
+    });
+    updateMessage({
+      messageId: result.messageId,
+      content: result.content,
+      isComplete: true,
+    });
+  } catch (error) {
+    removePendingAssistantMessage(assistantMessage);
+    addErrorMessage(error.message);
+  } finally {
+    setRequestPending(false);
+    event.target.value = '';
+  }
+  scrollToBottom();
 }
 
 function renderSessionMessages() {

@@ -35,6 +35,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getScreenshotsDirectory: () =>
     ipcRenderer.invoke("get-screenshots-directory"),
   getRecentScreenshots: () => ipcRenderer.invoke("get-recent-screenshots"),
+  saveUploadedScreenshot: (payload) =>
+    ipcRenderer.invoke("save-uploaded-screenshot", payload),
 
   // Test response
   testResponse: (prompt) => ipcRenderer.invoke("test-response", prompt),

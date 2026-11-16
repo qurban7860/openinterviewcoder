@@ -14,6 +14,7 @@ const {
   ensureScreenRecordingPermission,
   captureFullScreen,
   getRecentScreenshots,
+  saveUploadedScreenshot,
 } = require("./screenshot");
 const { initializeLLMService } = require("./llm-service");
 const config = require("./config");
@@ -149,6 +150,14 @@ ipcMain.handle("get-screenshots-directory", () => {
 
 ipcMain.handle("get-recent-screenshots", () => {
   return getRecentScreenshots();
+});
+
+ipcMain.handle("save-uploaded-screenshot", async (_event, payload = {}) => {
+  if (!payload || !Buffer.isBuffer(payload.buffer)) {
+    throw new Error("A screenshot file upload is required.");
+  }
+  const fileName = typeof payload.fileName === "string" ? payload.fileName : "upload.png";
+  return saveUploadedScreenshot(fileName, payload.buffer);
 });
 
 // IPC handlers for window controls
