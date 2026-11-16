@@ -33,7 +33,7 @@ if (typeof marked !== "undefined") {
 
 document.addEventListener("DOMContentLoaded", setupEventListeners);
 
-function setupEventListeners() {
+async function setupEventListeners() {
   document.querySelectorAll(".modifier-key").forEach((key) => {
     if (window.electronAPI.platform === "darwin") key.textContent = "⌘";
   });
@@ -122,11 +122,13 @@ async function hydrateSessions() {
     });
     activeSessionId = session.id;
     renderSessionOptions();
+    syncSessionForm();
     return;
   }
 
   activeSessionId = sessions.find((entry) => entry.active)?.id || sessions[0].id;
   renderSessionOptions(sessions);
+  syncSessionForm();
 }
 
 function renderSessionOptions(sessions = []) {
@@ -134,6 +136,83 @@ function renderSessionOptions(sessions = []) {
   sessionSelect.innerHTML = items.map((session) => (
     `<option value="${session.id}" ${session.id === activeSessionId ? 'selected' : ''}>${session.name}</option>`
   )).join('');
+}
+
+function buildSuggestionMarkup() {
+  const currentSession = window.electronAPI.getActiveSession ? window.electronAPI.getActiveSession() : null;
+  const session = currentSession || {};
+  const values = {
+    mode: session.mode || sessionModeInput.value || 'general',
+    role: session.role || sessionRoleInput.value || '',
+    company: session.company || sessionCompanyInput.value || '',
+    background: session.background || session.description || sessionBackgroundInput.value || '',
+    jobDescription: session.jobDescription || sessionJobDescriptionInput.value || '',
+  };
+
+  const suggestions = [
+    'Explain this concept with a simple example.',
+    'Help me solve this coding problem. Ask any essential clarifying questions, then explain the approach and complexity.',
+    'Review this code for bugs and suggest a clearer or more efficient solution.',
+  ];
+
+  const modeSuggestions = {
+    'coding-interview': [
+      `Clarify the requirements for this coding problem and explain your approach before writing code for ${values.role || 'this role'}.`,
+      'What edge cases or performance constraints should we discuss for this implementation?',
+      'How would you test this solution and explain the complexity trade-offs?',
+    ],
+    'system-design': [
+      `Design the core architecture for a system that supports ${values.jobDescription || 'the key requirements'} with clear scalability and reliability trade-offs.`,
+      'What are the most important components, APIs, and failure modes in this design?',
+      'How would you observe, test, and evolve this architecture as traffic and requirements grow?',
+    ],
+    behavioral: [
+      `Tell me about a time when ${values.background || 'your recent experience'} influenced a decision you made in a team setting.`,
+      'Describe a conflict or trade-off you handled well and how you measured success.',
+      'How do you adapt your communication style when working across teams with different priorities?',
+    ],
+    'project-discussion': [
+      `Walk me through a project where ${values.background || 'your recent experience'} shaped the final design and delivery plan.`,
+      'What trade-offs did you make in this project, and what would you do differently now?',
+      'How did you validate success and learn from the risks or bottlenecks in this work?',
+    ],
+  };
+
+  const list = modeSuggestions[values.mode] || suggestions;
+  return list.map((question) => `
+    <button class="suggestion" type="button" data-question="${question.replace(/"/g, '&quot;')}">
+      ${question.length > 80 ? `${question.slice(0, 77)}...` : question} <span>↗</span>
+    </button>
+  `).join('');
+}
+
+function renderFocusAreas() {
+  const focusAreas = document.getElementById('focus-areas');
+  if (!focusAreas) return;
+
+  const currentSession = window.electronAPI.getActiveSession ? window.electronAPI.getActiveSession() : null;
+  const session = currentSession || {};
+  const values = {
+    mode: session.mode || sessionModeInput.value || 'general',
+    role: session.role || sessionRoleInput.value || '',
+    company: session.company || sessionCompanyInput.value || '',
+    background: session.background || session.description || sessionBackgroundInput.value || '',
+    jobDescription: session.jobDescription || sessionJobDescriptionInput.value || '',
+  };
+
+  const { buildInterviewChecklist, buildInterviewFocusAreas, buildInterviewReadinessSummary } = require('./interview-orchestration');
+  const items = buildInterviewFocusAreas(values);
+  const summary = buildInterviewReadinessSummary(values);
+  const checklist = buildInterviewChecklist(values);
+
+  focusAreas.innerHTML = `
+    <div class="focus-areas-title">Readiness brief</div>
+    <div class="focus-area-item">${summary}</div>
+    <div class="focus-areas-title">Focus areas</div>
+    ${items.map((item) => `<div class="focus-area-item">• ${item}</div>`).join('')}
+    <div class="focus-areas-title">Checklist</div>
+    ${checklist.map((item) => `<div class="focus-area-item">✓ ${item}</div>`).join('')}
+  `;
 }
 
 function syncSessionForm() {
@@ -146,6 +225,17 @@ function syncSessionForm() {
   sessionModeInput.value = currentSession.mode || 'general';
   sessionBackgroundInput.value = currentSession.background || currentSession.description || '';
   sessionJobDescriptionInput.value = currentSession.jobDescription || '';
+  const suggestionsContainer = document.querySelector('.suggestions');
+  if (suggestionsContainer) {
+    suggestionsContainer.innerHTML = buildSuggestionMarkup();
+    suggestionsContainer.querySelectorAll('.suggestion').forEach((button) => {
+      button.addEventListener('click', () => {
+        questionInput.value = button.dataset.question;
+        questionForm.requestSubmit();
+      });
+    });
+  }
+  renderFocusAreas();
 }
 
 async function saveSessionMeta() {

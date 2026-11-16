@@ -54,6 +54,13 @@ An AI-powered coding assistant that helps you during screen sharing sessions. Th
    npm run build:win
    ```
 
+6. Launch the generated installer when the build completes:
+   ```bash
+   npm run install:win
+   ```
+
+   The installer is created in the `dist` folder as a Windows NSIS setup file.
+
 ## Project Structure
 
 ```

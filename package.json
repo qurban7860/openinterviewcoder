@@ -2,15 +2,19 @@
   "name": "open-interview-coder",
   "version": "0.1.0",
   "description": "A desktop AI coding assistant for screen-sharing workflows",
+  "author": "Open Interview Coder Contributors",
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
     "dev": "electron . --debug",
-    "test": "node --test",
+    "test": "node --test --test-concurrency=8",
+    "test:parallel": "node --test --test-concurrency=8",
     "build": "electron-builder",
     "build:mac": "electron-builder --mac",
     "build:win": "electron-builder --win --config.win.signAndEditExecutable=false",
     "build:win:local": "electron-builder --win --config.win.signAndEditExecutable=false",
+    "build:win:install": "npm run build:win && start dist\\\"Open Interview Coder Setup 0.1.0.exe\"",
+    "install:win": "start dist\\\"Open Interview Coder Setup 0.1.0.exe\"",
     "build:linux": "electron-builder --linux"
   },
   "dependencies": {
