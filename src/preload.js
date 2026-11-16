@@ -47,6 +47,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
   onResetChat: (callback) =>
     ipcRenderer.on("reset-chat", (event) => callback()),
 
+  createSession: (payload) => ipcRenderer.invoke("create-session", payload),
+  listSessions: () => ipcRenderer.invoke("list-sessions"),
+  setActiveSession: (sessionId) => ipcRenderer.invoke("set-active-session", sessionId),
+  getActiveSession: () => ipcRenderer.invoke("get-active-session"),
+
   // Window position
   onWindowPositionChanged: (callback) =>
     ipcRenderer.on("window-position-changed", (event, value) =>

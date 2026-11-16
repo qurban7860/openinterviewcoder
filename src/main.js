@@ -17,6 +17,7 @@ const {
 } = require("./screenshot");
 const { initializeLLMService } = require("./llm-service");
 const config = require("./config");
+const { createSession, getActiveSession, listSessions, setActiveSession } = require("./session-manager");
 
 // IPC handlers for settings
 ipcMain.handle("get-settings", () => {
@@ -95,6 +96,27 @@ ipcMain.handle("reset-chat", (event) => {
   }
   return true;
 });
+
+ipcMain.handle("create-session", (_event, payload = {}) => {
+  const session = createSession({
+    name: payload.name || `Interview ${listSessions().length + 1}`,
+    interviewType: payload.interviewType || "general",
+    mode: payload.mode || "general",
+    description: payload.description || "",
+    company: payload.company || "",
+    role: payload.role || "",
+  });
+  return session;
+});
+
+ipcMain.handle("list-sessions", () => listSessions());
+
+ipcMain.handle("set-active-session", (_event, sessionId) => {
+  if (!sessionId) return getActiveSession();
+  return setActiveSession(sessionId);
+});
+
+ipcMain.handle("get-active-session", () => getActiveSession());
 
 // IPC handler for context menu
 ipcMain.handle("build-context-menu", (event) => {

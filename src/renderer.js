@@ -7,6 +7,8 @@ const startListeningButton = document.getElementById("start-listening");
 const stopListeningButton = document.getElementById("stop-listening");
 const transcriptApplyButton = document.getElementById("transcript-apply-button");
 const micStatus = document.getElementById("mic-status");
+const sessionSelect = document.getElementById("session-select");
+const newSessionButton = document.getElementById("new-session-button");
 
 let messages = [];
 let pendingRequests = 0;
@@ -15,6 +17,7 @@ let speechRecognition = null;
 let transcriptBuffer = "";
 let listening = false;
 let activeMicStream = null;
+let activeSessionId = null;
 
 if (typeof marked !== "undefined") {
   marked.setOptions({ breaks: true, gfm: true });
@@ -76,6 +79,15 @@ function setupEventListeners() {
     transcriptBuffer = "";
     updateMicStatus("Transcript sent");
   });
+
+  newSessionButton.addEventListener("click", createSessionFromUI);
+  sessionSelect.addEventListener("change", async (event) => {
+    const selectedId = event.target.value;
+    if (!selectedId) return;
+    const session = await window.electronAPI.setActiveSession(selectedId);
+    activeSessionId = session && session.id ? session.id : null;
+    renderSessionMessages();
+  });
   document.querySelectorAll(".suggestion").forEach((button) => {
     button.addEventListener("click", () => {
       questionInput.value = button.dataset.question;
@@ -83,9 +95,65 @@ function setupEventListeners() {
     });
   });
   populateMicrophoneDevices();
+  await hydrateSessions();
   window.electronAPI.getSettings().then(updateProviderBadge).catch((error) => {
     addErrorMessage(`Couldn't load provider settings: ${error.message}`);
   });
+}
+
+async function hydrateSessions() {
+  const sessions = await window.electronAPI.listSessions();
+  if (!sessions || !sessions.length) {
+    const session = await window.electronAPI.createSession({
+      name: 'New Interview Session',
+      interviewType: 'general',
+      mode: 'general',
+    });
+    activeSessionId = session.id;
+    renderSessionOptions();
+    return;
+  }
+
+  activeSessionId = sessions.find((entry) => entry.active)?.id || sessions[0].id;
+  renderSessionOptions(sessions);
+}
+
+function renderSessionOptions(sessions = []) {
+  const items = sessions.length ? sessions : [{ id: activeSessionId, name: 'Current session', active: true }];
+  sessionSelect.innerHTML = items.map((session) => (
+    `<option value="${session.id}" ${session.id === activeSessionId ? 'selected' : ''}>${session.name}</option>`
+  )).join('');
+}
+
+async function createSessionFromUI() {
+  const session = await window.electronAPI.createSession({
+    name: `Interview ${Date.now().toString().slice(-5)}`,
+    interviewType: 'general',
+    mode: 'general',
+  });
+  activeSessionId = session.id;
+  const sessions = await window.electronAPI.listSessions();
+  renderSessionOptions(sessions);
+  resetChat();
+}
+
+function renderSessionMessages() {
+  if (!activeSessionId) return;
+  const currentSession = window.electronAPI.getActiveSession ? window.electronAPI.getActiveSession() : null;
+  if (!currentSession || !Array.isArray(currentSession.messages)) {
+    resetChat();
+    return;
+  }
+  messages = currentSession.messages;
+  chatHistory.replaceChildren();
+  for (const message of messages) {
+    const bubble = document.createElement('div');
+    bubble.className = message.type === 'assistant' ? 'message assistant' : 'message user';
+    bubble.textContent = message.content;
+    chatHistory.appendChild(bubble);
+  }
+  updateNullStateVisibility();
+  scrollToBottom();
 }
 
 async function populateMicrophoneDevices() {
