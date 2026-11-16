@@ -54,12 +54,17 @@ function buildInterviewSystemPrompt({
   role = '',
   company = '',
   description = '',
+  background = '',
+  jobDescription = '',
 } = {}) {
   const normalizedMode = normalizeInterviewMode(mode || interviewType || 'general');
   const definition = MODE_DEFINITIONS[normalizedMode] || MODE_DEFINITIONS.general;
   const rolePart = role ? `Role: ${role}.` : 'Role: not specified.';
   const companyPart = company ? `Company: ${company}.` : 'Company: not specified.';
-  const descriptionPart = description ? `Additional context: ${description}.` : '';
+  const relevantBackground = background || description || '';
+  const relevantJobDescription = jobDescription || '';
+  const backgroundPart = relevantBackground ? `Candidate background: ${relevantBackground}.` : '';
+  const jobDescriptionPart = relevantJobDescription ? `Job description: ${relevantJobDescription}.` : '';
 
   const base = [
     'You are an interview copilot for software engineering and professional interviews.',
@@ -67,7 +72,8 @@ function buildInterviewSystemPrompt({
     `Interview type: ${interviewType || 'general'}.`,
     rolePart,
     companyPart,
-    descriptionPart,
+    backgroundPart,
+    jobDescriptionPart,
     'Answer in text only. Do not generate audio playback or spoken output.',
     'Focus on clarity, practicality, and interview-readiness.',
     ...definition.guidance,
@@ -97,12 +103,16 @@ function buildInterviewUserMessage({ prompt, session = {} }) {
   const sessionRole = session.role || 'Not specified';
   const sessionCompany = session.company || 'Not specified';
   const sessionMode = normalizeInterviewMode(session.mode || session.interviewType || 'general');
+  const sessionBackground = session.background || session.description || 'Not specified';
+  const sessionJobDescription = session.jobDescription || 'Not specified';
 
   const context = [
     `Session: ${sessionName}`,
     `Role: ${sessionRole}`,
     `Company: ${sessionCompany}`,
     `Mode: ${sessionMode}`,
+    `Background: ${sessionBackground}`,
+    `Job description: ${sessionJobDescription}`,
   ].join(' | ');
 
   return `${context}\n\nUser request: ${prompt}`;

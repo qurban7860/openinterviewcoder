@@ -9,6 +9,7 @@ An AI-powered coding assistant that helps you during screen sharing sessions. Th
 - Text-only assistant responses in the chat window
 - Microphone listening with browser-based speech recognition for question capture
 - Screenshot analysis capabilities for supported vision-capable models
+- Interview session context fields for role, company, background summary, and job description
 - Provider selection for OpenAI, Google Gemini, and Anthropic
 - Encrypted local API-key storage
 - Provider capability awareness for text, vision, streaming, and transcription support
@@ -105,9 +106,10 @@ The built applications will be available in the `dist` directory.
 ## Usage
 
 1. Launch the application
-2. Select a microphone in the chat composer and click Listen to capture interviewer audio or your own spoken question.
-3. When a transcript appears, review it and click Use transcript to send it into the chat.
-4. Use the keyboard shortcuts to control the assistant:
+2. Add the role, company, candidate background summary, and job description in the session metadata so the assistant can ground interview answers in your actual context.
+3. Select a microphone in the chat composer and click Listen to capture interviewer audio or your own spoken question.
+4. When a transcript appears, review it and click Use transcript to send it into the chat.
+5. Use the keyboard shortcuts to control the assistant:
 
    - `Cmd/Ctrl + Shift + S`: Capture and analyze a screenshot
    - `Cmd/Ctrl + Shift + H`: Toggle assistant visibility
@@ -115,9 +117,9 @@ The built applications will be available in the `dist` directory.
    - `Cmd/Ctrl + ←/→/↑/↓`: Move the assistant window
    - `Cmd + ,`: Open settings
 
-3. Ask questions in the chat box, choose a suggestion, or use the screenshot
+6. Ask questions in the chat box, choose a suggestion, or use the screenshot
    shortcut. Press Enter to send and Shift+Enter for a new line.
-4. Use the window controls to hide the assistant or quit the application.
+7. Use the window controls to hide the assistant or quit the application.
 
 ## Configuration
 

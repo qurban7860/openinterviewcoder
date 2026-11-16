@@ -14,6 +14,8 @@ function createSession({
   interviewType = 'general',
   mode = 'general',
   description = '',
+  background = '',
+  jobDescription = '',
   company = '',
   role = '',
   messages = [],
@@ -25,6 +27,8 @@ function createSession({
     interviewType,
     mode: normalizeMode(mode),
     description,
+    background: background || description || '',
+    jobDescription: jobDescription || '',
     company,
     role,
     createdAt: new Date().toISOString(),
@@ -99,6 +103,10 @@ function updateSessionMeta(sessionId, updates = {}) {
   if (typeof updates.role === 'string') next.role = updates.role.trim();
   if (typeof updates.company === 'string') next.company = updates.company.trim();
   if (typeof updates.description === 'string') next.description = updates.description.trim();
+  if (typeof updates.background === 'string') next.background = updates.background.trim();
+  if (typeof updates.jobDescription === 'string') next.jobDescription = updates.jobDescription.trim();
+  if (!next.background && next.description) next.background = next.description;
+  if (!next.description && next.background) next.description = next.background;
   if (typeof updates.interviewType === 'string') next.interviewType = updates.interviewType.trim();
 
   sessions.set(sessionId, next);

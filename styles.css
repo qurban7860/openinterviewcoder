@@ -115,15 +115,25 @@ button {
 }
 
 .session-field input,
-.session-field select {
+.session-field select,
+.session-field textarea {
   width: 100%;
   min-height: 30px;
-  padding: 0 8px;
+  padding: 8px;
   border: 1px solid rgba(165, 183, 212, 0.17);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.025);
   color: #edf1f8;
   font-size: 11px;
+  resize: vertical;
+}
+
+.session-field textarea {
+  min-height: 72px;
+}
+
+.session-field-wide {
+  grid-column: 1 / -1;
 }
 
 .save-session-button {

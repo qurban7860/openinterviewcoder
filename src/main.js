@@ -110,6 +110,8 @@ ipcMain.handle("create-session", (_event, payload = {}) => {
     interviewType: payload.interviewType || "general",
     mode: payload.mode || "general",
     description: payload.description || "",
+    background: payload.background || payload.description || "",
+    jobDescription: payload.jobDescription || "",
     company: payload.company || "",
     role: payload.role || "",
   });

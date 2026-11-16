@@ -13,6 +13,8 @@ const sessionNameInput = document.getElementById("session-name-input");
 const sessionRoleInput = document.getElementById("session-role-input");
 const sessionCompanyInput = document.getElementById("session-company-input");
 const sessionModeInput = document.getElementById("session-mode-input");
+const sessionBackgroundInput = document.getElementById("session-background-input");
+const sessionJobDescriptionInput = document.getElementById("session-job-description-input");
 const saveSessionMetaButton = document.getElementById("save-session-meta");
 const manualScreenshotUpload = document.getElementById("manual-screenshot-upload");
 
@@ -142,6 +144,8 @@ function syncSessionForm() {
   sessionRoleInput.value = currentSession.role || '';
   sessionCompanyInput.value = currentSession.company || '';
   sessionModeInput.value = currentSession.mode || 'general';
+  sessionBackgroundInput.value = currentSession.background || currentSession.description || '';
+  sessionJobDescriptionInput.value = currentSession.jobDescription || '';
 }
 
 async function saveSessionMeta() {
@@ -151,6 +155,8 @@ async function saveSessionMeta() {
     role: sessionRoleInput.value.trim(),
     company: sessionCompanyInput.value.trim(),
     mode: sessionModeInput.value,
+    background: sessionBackgroundInput.value.trim(),
+    jobDescription: sessionJobDescriptionInput.value.trim(),
   };
 
   const updatedSession = await window.electronAPI.updateSessionMeta(activeSessionId, updates);

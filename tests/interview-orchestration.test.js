@@ -41,3 +41,17 @@ test('user message includes session context without forcing requirements', () =>
   assert.match(prompt, /Frontend round/i);
   assert.match(prompt, /Explain this approach\./i);
 });
+
+test('system prompt includes candidate background and role requirements', () => {
+  const prompt = buildInterviewSystemPrompt({
+    interviewType: 'general',
+    mode: 'project-discussion',
+    role: 'Staff Engineer',
+    company: 'Northstar',
+    background: 'Built a platform serving 5M users with a focus on reliability and observability.',
+    jobDescription: 'Lead architecture, mentor engineers, and drive platform standards across the team.',
+  });
+
+  assert.match(prompt, /Built a platform serving 5M users/i);
+  assert.match(prompt, /Lead architecture, mentor engineers/i);
+});
