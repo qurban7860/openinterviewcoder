@@ -6,7 +6,7 @@
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
-    "dev": "electron . --debug",
+    "dev": "electron . -- --debug",
     "test": "node --test --test-concurrency=8",
     "test:parallel": "node --test --test-concurrency=8",
     "build": "electron-builder",

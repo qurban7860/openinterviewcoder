@@ -1,7 +1,5 @@
 const { contextBridge, ipcRenderer, shell } = require("electron");
 const { pathToFileURL } = require("url");
-const interviewOrchestration = require("./interview-orchestration");
-const microphoneErrors = require("./microphone-errors");
 
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
@@ -56,14 +54,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
   setActiveSession: (sessionId) => ipcRenderer.invoke("set-active-session", sessionId),
   getActiveSession: () => ipcRenderer.invoke("get-active-session"),
   updateSessionMeta: (sessionId, updates) => ipcRenderer.invoke("update-session-meta", sessionId, updates),
-  buildInterviewBrief: (values) => ({
-    suggestions: interviewOrchestration.buildInterviewSuggestions(values),
-    focusAreas: interviewOrchestration.buildInterviewFocusAreas(values),
-    readinessSummary: interviewOrchestration.buildInterviewReadinessSummary(values),
-    checklist: interviewOrchestration.buildInterviewChecklist(values),
-  }),
-  getMicrophoneErrorMessage: microphoneErrors.getMicrophoneErrorMessage,
-  getSpeechRecognitionErrorMessage: microphoneErrors.getSpeechRecognitionErrorMessage,
+  buildInterviewBrief: (values) => ipcRenderer.invoke("build-interview-brief", values),
+  getMicrophoneErrorMessage: (errorName) =>
+    ipcRenderer.invoke("get-microphone-error-message", errorName),
+  getSpeechRecognitionErrorMessage: (errorName) =>
+    ipcRenderer.invoke("get-speech-recognition-error-message", errorName),
 
   // Window position
   onWindowPositionChanged: (callback) =>

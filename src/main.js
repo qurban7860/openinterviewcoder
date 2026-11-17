@@ -20,6 +20,8 @@ const {
 } = require("./screenshot");
 const { initializeLLMService } = require("./llm-service");
 const config = require("./config");
+const interviewOrchestration = require("./interview-orchestration");
+const microphoneErrors = require("./microphone-errors");
 const {
   createSession,
   getActiveSession,
@@ -128,6 +130,21 @@ ipcMain.handle("set-active-session", (_event, sessionId) => {
 });
 
 ipcMain.handle("get-active-session", () => getActiveSession());
+
+ipcMain.handle("build-interview-brief", (_event, values = {}) => ({
+  suggestions: interviewOrchestration.buildInterviewSuggestions(values),
+  focusAreas: interviewOrchestration.buildInterviewFocusAreas(values),
+  readinessSummary: interviewOrchestration.buildInterviewReadinessSummary(values),
+  checklist: interviewOrchestration.buildInterviewChecklist(values),
+}));
+
+ipcMain.handle("get-microphone-error-message", (_event, errorName) =>
+  microphoneErrors.getMicrophoneErrorMessage(errorName)
+);
+
+ipcMain.handle("get-speech-recognition-error-message", (_event, errorName) =>
+  microphoneErrors.getSpeechRecognitionErrorMessage(errorName)
+);
 
 ipcMain.handle("update-session-meta", (_event, sessionId, updates = {}) => {
   if (!sessionId) return getActiveSession();
