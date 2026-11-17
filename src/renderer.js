@@ -26,6 +26,7 @@ let transcriptBuffer = "";
 let listening = false;
 let activeMicStream = null;
 let activeSessionId = null;
+let speechRestartTimer = null;
 
 if (typeof marked !== "undefined") {
   marked.setOptions({ breaks: true, gfm: true });
@@ -34,6 +35,7 @@ if (typeof marked !== "undefined") {
 document.addEventListener("DOMContentLoaded", setupEventListeners);
 
 async function setupEventListeners() {
+  stopListeningButton.disabled = true;
   document.querySelectorAll(".modifier-key").forEach((key) => {
     if (window.electronAPI.platform === "darwin") key.textContent = "⌘";
   });
@@ -76,6 +78,9 @@ async function setupEventListeners() {
   });
   startListeningButton.addEventListener("click", startListening);
   stopListeningButton.addEventListener("click", stopListening);
+  micDeviceSelect.addEventListener("change", () => {
+    if (listening) stopListening();
+  });
   transcriptApplyButton.addEventListener("click", () => {
     const transcript = transcriptBuffer.trim();
     if (!transcript) {
@@ -96,8 +101,8 @@ async function setupEventListeners() {
     if (!selectedId) return;
     const session = await window.electronAPI.setActiveSession(selectedId);
     activeSessionId = session && session.id ? session.id : null;
-    syncSessionForm();
-    renderSessionMessages();
+    await syncSessionForm(session);
+    await renderSessionMessages(session);
   });
   document.querySelectorAll(".suggestion").forEach((button) => {
     button.addEventListener("click", () => {
@@ -122,25 +127,30 @@ async function hydrateSessions() {
     });
     activeSessionId = session.id;
     renderSessionOptions();
-    syncSessionForm();
+    await syncSessionForm(session);
     return;
   }
 
   activeSessionId = sessions.find((entry) => entry.active)?.id || sessions[0].id;
   renderSessionOptions(sessions);
-  syncSessionForm();
+  await syncSessionForm();
 }
 
 function renderSessionOptions(sessions = []) {
   const items = sessions.length ? sessions : [{ id: activeSessionId, name: 'Current session', active: true }];
-  sessionSelect.innerHTML = items.map((session) => (
-    `<option value="${session.id}" ${session.id === activeSessionId ? 'selected' : ''}>${session.name}</option>`
-  )).join('');
+  sessionSelect.replaceChildren();
+  for (const session of items) {
+    const option = document.createElement('option');
+    option.value = session.id;
+    option.textContent = session.name || 'Interview session';
+    option.selected = session.id === activeSessionId;
+    sessionSelect.appendChild(option);
+  }
 }
 
-function buildSuggestionMarkup() {
-  const currentSession = window.electronAPI.getActiveSession ? window.electronAPI.getActiveSession() : null;
-  const session = currentSession || {};
+function renderSuggestions(session = {}) {
+  const suggestionsContainer = document.querySelector('.suggestions');
+  if (!suggestionsContainer) return;
   const values = {
     mode: session.mode || sessionModeInput.value || 'general',
     role: session.role || sessionRoleInput.value || '',
@@ -149,7 +159,7 @@ function buildSuggestionMarkup() {
     jobDescription: session.jobDescription || sessionJobDescriptionInput.value || '',
   };
 
-  const suggestions = [
+  const defaultSuggestions = [
     'Explain this concept with a simple example.',
     'Help me solve this coding problem. Ask any essential clarifying questions, then explain the approach and complexity.',
     'Review this code for bugs and suggest a clearer or more efficient solution.',
@@ -178,20 +188,32 @@ function buildSuggestionMarkup() {
     ],
   };
 
-  const list = modeSuggestions[values.mode] || suggestions;
-  return list.map((question) => `
-    <button class="suggestion" type="button" data-question="${question.replace(/"/g, '&quot;')}">
-      ${question.length > 80 ? `${question.slice(0, 77)}...` : question} <span>↗</span>
-    </button>
-  `).join('');
+  const list = modeSuggestions[values.mode] || defaultSuggestions;
+  suggestionsContainer.replaceChildren();
+  for (const question of list) {
+    const button = document.createElement('button');
+    button.className = 'suggestion';
+    button.type = 'button';
+    button.dataset.question = question;
+    const label = document.createElement('span');
+    label.className = 'suggestion-label';
+    label.textContent = question.length > 80 ? `${question.slice(0, 77)}...` : question;
+    const arrow = document.createElement('span');
+    arrow.setAttribute('aria-hidden', 'true');
+    arrow.textContent = '↗';
+    button.append(label, arrow);
+    button.addEventListener('click', () => {
+      questionInput.value = button.dataset.question;
+      questionForm.requestSubmit();
+    });
+    suggestionsContainer.appendChild(button);
+  }
 }
 
-function renderFocusAreas() {
+function renderFocusAreas(session = {}) {
   const focusAreas = document.getElementById('focus-areas');
   if (!focusAreas) return;
 
-  const currentSession = window.electronAPI.getActiveSession ? window.electronAPI.getActiveSession() : null;
-  const session = currentSession || {};
   const values = {
     mode: session.mode || sessionModeInput.value || 'general',
     role: session.role || sessionRoleInput.value || '',
@@ -200,24 +222,32 @@ function renderFocusAreas() {
     jobDescription: session.jobDescription || sessionJobDescriptionInput.value || '',
   };
 
-  const { buildInterviewChecklist, buildInterviewFocusAreas, buildInterviewReadinessSummary } = require('./interview-orchestration');
-  const items = buildInterviewFocusAreas(values);
-  const summary = buildInterviewReadinessSummary(values);
-  const checklist = buildInterviewChecklist(values);
+  const hasContext = Boolean(values.role || values.company || values.background || values.jobDescription);
+  focusAreas.hidden = !hasContext;
+  if (!hasContext) return;
 
-  focusAreas.innerHTML = `
-    <div class="focus-areas-title">Readiness brief</div>
-    <div class="focus-area-item">${summary}</div>
-    <div class="focus-areas-title">Focus areas</div>
-    ${items.map((item) => `<div class="focus-area-item">• ${item}</div>`).join('')}
-    <div class="focus-areas-title">Checklist</div>
-    ${checklist.map((item) => `<div class="focus-area-item">✓ ${item}</div>`).join('')}
-  `;
+  const brief = window.electronAPI.buildInterviewBrief(values);
+  focusAreas.replaceChildren();
+  const appendSection = (title, items) => {
+    const heading = document.createElement('div');
+    heading.className = 'focus-areas-title';
+    heading.textContent = title;
+    focusAreas.appendChild(heading);
+    for (const item of items) {
+      const row = document.createElement('div');
+      row.className = 'focus-area-item';
+      row.textContent = item;
+      focusAreas.appendChild(row);
+    }
+  };
+  appendSection('Readiness brief', [brief.readinessSummary]);
+  appendSection('Focus areas', brief.focusAreas);
+  appendSection('Checklist', brief.checklist);
 }
 
-function syncSessionForm() {
+async function syncSessionForm(session = null) {
   if (!activeSessionId) return;
-  const currentSession = window.electronAPI.getActiveSession ? window.electronAPI.getActiveSession() : null;
+  const currentSession = session || await window.electronAPI.getActiveSession();
   if (!currentSession) return;
   sessionNameInput.value = currentSession.name || '';
   sessionRoleInput.value = currentSession.role || '';
@@ -225,17 +255,13 @@ function syncSessionForm() {
   sessionModeInput.value = currentSession.mode || 'general';
   sessionBackgroundInput.value = currentSession.background || currentSession.description || '';
   sessionJobDescriptionInput.value = currentSession.jobDescription || '';
-  const suggestionsContainer = document.querySelector('.suggestions');
-  if (suggestionsContainer) {
-    suggestionsContainer.innerHTML = buildSuggestionMarkup();
-    suggestionsContainer.querySelectorAll('.suggestion').forEach((button) => {
-      button.addEventListener('click', () => {
-        questionInput.value = button.dataset.question;
-        questionForm.requestSubmit();
-      });
-    });
+  const summary = document.getElementById('session-details-summary');
+  if (summary) {
+    const contextLabel = [currentSession.role, currentSession.company].filter(Boolean).join(' · ');
+    summary.textContent = contextLabel ? `Interview details · ${contextLabel}` : 'Interview details · Add role context';
   }
-  renderFocusAreas();
+  renderSuggestions(currentSession);
+  renderFocusAreas(currentSession);
 }
 
 async function saveSessionMeta() {
@@ -253,19 +279,22 @@ async function saveSessionMeta() {
   if (!updatedSession) return;
   const sessions = await window.electronAPI.listSessions();
   renderSessionOptions(sessions);
-  syncSessionForm();
+  await syncSessionForm(updatedSession);
+  document.getElementById('session-config-panel').open = false;
 }
 
 async function createSessionFromUI() {
-  const session = await window.electronAPI.createSession({
+  const createdSession = await window.electronAPI.createSession({
     name: `Interview ${Date.now().toString().slice(-5)}`,
     interviewType: 'general',
     mode: 'general',
   });
+  const session = await window.electronAPI.setActiveSession(createdSession.id);
   activeSessionId = session.id;
   const sessions = await window.electronAPI.listSessions();
   renderSessionOptions(sessions);
-  syncSessionForm();
+  await syncSessionForm(session);
+  document.getElementById('session-config-panel').open = true;
   resetChat();
 }
 
@@ -273,34 +302,47 @@ async function handleManualScreenshotUpload(event) {
   const [file] = event.target.files || [];
   if (!file) return;
 
-  const buffer = await file.arrayBuffer();
-  const savedPath = await window.electronAPI.saveUploadedScreenshot({
-    fileName: file.name,
-    buffer: Buffer.from(buffer),
-  });
+  if (!file.type.startsWith('image/')) {
+    addErrorMessage('Choose an image file to analyze.');
+    event.target.value = '';
+    return;
+  }
+  if (file.size > 20 * 1024 * 1024) {
+    addErrorMessage('Choose an image smaller than 20 MB.');
+    event.target.value = '';
+    return;
+  }
 
-  const screenshotMessage = {
-    type: 'screenshot',
-    timestamp: Date.now(),
-    filePath: savedPath,
-  };
-
-  messages.push(screenshotMessage);
-  const screenshotEl = document.createElement('div');
-  screenshotEl.className = 'message user';
-  const image = document.createElement('img');
-  image.src = window.electronAPI.toFileUrl(savedPath);
-  image.className = 'screenshot-thumbnail';
-  image.alt = 'Uploaded screenshot';
-  image.addEventListener('click', () => window.electronAPI.openFile(savedPath));
-  screenshotEl.appendChild(image);
-  chatHistory.appendChild(screenshotEl);
-
-  const assistantMessage = createPendingAssistantMessage();
-  const history = getConversationHistory();
-  const activeSession = await window.electronAPI.getActiveSession();
-  setRequestPending(true);
+  let assistantMessage = null;
+  let requestStarted = false;
   try {
+    const savedPath = await window.electronAPI.saveUploadedScreenshot({
+      fileName: file.name,
+      buffer: new Uint8Array(await file.arrayBuffer()),
+    });
+
+    const screenshotMessage = {
+      type: 'screenshot',
+      timestamp: Date.now(),
+      filePath: savedPath,
+    };
+
+    messages.push(screenshotMessage);
+    const screenshotEl = document.createElement('div');
+    screenshotEl.className = 'message user';
+    const image = document.createElement('img');
+    image.src = window.electronAPI.toFileUrl(savedPath);
+    image.className = 'screenshot-thumbnail';
+    image.alt = 'Uploaded screenshot';
+    image.addEventListener('click', () => window.electronAPI.openFile(savedPath));
+    screenshotEl.appendChild(image);
+    chatHistory.appendChild(screenshotEl);
+
+    assistantMessage = createPendingAssistantMessage();
+    const history = getConversationHistory();
+    const activeSession = await window.electronAPI.getActiveSession();
+    setRequestPending(true);
+    requestStarted = true;
     const result = await window.electronAPI.analyzeScreenshot({
       filePath: savedPath,
       history,
@@ -313,18 +355,18 @@ async function handleManualScreenshotUpload(event) {
       isComplete: true,
     });
   } catch (error) {
-    removePendingAssistantMessage(assistantMessage);
+    if (assistantMessage) removePendingAssistantMessage(assistantMessage);
     addErrorMessage(error.message);
   } finally {
-    setRequestPending(false);
+    if (requestStarted) setRequestPending(false);
     event.target.value = '';
   }
   scrollToBottom();
 }
 
-function renderSessionMessages() {
+async function renderSessionMessages(session = null) {
   if (!activeSessionId) return;
-  const currentSession = window.electronAPI.getActiveSession ? window.electronAPI.getActiveSession() : null;
+  const currentSession = session || await window.electronAPI.getActiveSession();
   if (!currentSession || !Array.isArray(currentSession.messages)) {
     resetChat();
     return;
@@ -348,38 +390,48 @@ async function populateMicrophoneDevices() {
   }
 
   try {
+    const selectedDeviceId = micDeviceSelect.value;
     const devices = await navigator.mediaDevices.enumerateDevices();
     const audioInputs = devices.filter((device) => device.kind === "audioinput");
     if (!audioInputs.length) {
-      micDeviceSelect.innerHTML = '<option value="">No microphone detected</option>';
-      updateMicStatus("No microphone detected");
+      const option = document.createElement('option');
+      option.value = '';
+      option.textContent = 'No microphone detected';
+      micDeviceSelect.replaceChildren(option);
+      updateMicStatus("No microphone detected", "error");
       return;
     }
 
-    micDeviceSelect.innerHTML = audioInputs
-      .map(
-        (device, index) =>
-          `<option value="${device.deviceId || index}">${device.label || `Microphone ${index + 1}`}</option>`
-      )
-      .join("");
-    updateMicStatus("Microphone ready");
+    micDeviceSelect.replaceChildren();
+    audioInputs.forEach((device, index) => {
+      const option = document.createElement('option');
+      option.value = device.deviceId || '';
+      option.textContent = device.label || `Microphone ${index + 1}`;
+      option.selected = device.deviceId === selectedDeviceId;
+      micDeviceSelect.appendChild(option);
+    });
+    if (selectedDeviceId && !audioInputs.some((device) => device.deviceId === selectedDeviceId)) {
+      micDeviceSelect.selectedIndex = 0;
+    }
+    updateMicStatus("Microphone ready", "ready");
   } catch (error) {
-    updateMicStatus("Microphone access unavailable");
+    updateMicStatus("Microphone access unavailable", "error");
     console.error("Unable to enumerate microphone devices:", error);
   }
 }
 
-function updateMicStatus(message) {
+function updateMicStatus(message, state = "") {
   if (!micStatus) return;
   micStatus.textContent = message;
-  micStatus.style.color = listening ? "#8be0b7" : "#8a96ad";
+  micStatus.dataset.state = state || (listening ? "ready" : "");
 }
 
 async function startListening() {
+  if (listening) return;
   const SpeechRecognitionAPI =
     window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognitionAPI) {
-    updateMicStatus("Speech recognition is not supported in this browser");
+    updateMicStatus("Speech recognition is not supported in this browser", "error");
     addErrorMessage("Speech recognition is not available in this environment. You can still type your question manually.");
     return;
   }
@@ -389,76 +441,93 @@ async function startListening() {
     return;
   }
 
+  let stream;
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        deviceId: micDeviceSelect.value ? { exact: micDeviceSelect.value } : undefined,
-      },
-    });
-    activeMicStream = stream;
-    listening = true;
-    transcriptBuffer = questionInput.value.trim();
-    updateMicStatus("Listening…");
-
-    if (speechRecognition) {
-      try {
-        speechRecognition.stop();
-      } catch (error) {
-        // Recognition may already be stopped.
-      }
-    }
-
-    speechRecognition = new SpeechRecognitionAPI();
-    speechRecognition.continuous = true;
-    speechRecognition.interimResults = true;
-    speechRecognition.lang = "en-US";
-
-    speechRecognition.onresult = (event) => {
-      let latestTranscript = "";
-      for (let index = event.resultIndex; index < event.results.length; index += 1) {
-        const resultItem = event.results[index];
-        latestTranscript += resultItem[0].transcript;
-        if (resultItem.isFinal) {
-          transcriptBuffer = `${transcriptBuffer} ${latestTranscript}`.trim();
-          questionInput.value = transcriptBuffer;
-          updateMicStatus("Transcript ready");
-        }
-      }
-      if (!latestTranscript.trim()) return;
-      questionInput.value = `${transcriptBuffer} ${latestTranscript}`.trim();
-    };
-
-    speechRecognition.onerror = (event) => {
-      const detail = event.error || "speech recognition failed";
-      updateMicStatus(`Microphone error: ${detail}`);
-      if (detail === "not-allowed" || detail === "service-not-allowed") {
-        addErrorMessage("Microphone permission was denied. Allow microphone access in your OS/browser settings and try again.");
-      }
-    };
-
-    speechRecognition.onend = () => {
-      if (!listening) return;
-      try {
-        speechRecognition.start();
-      } catch (error) {
-        updateMicStatus("Microphone listener restarted");
-      }
-    };
-
-    speechRecognition.start();
+    const audio = micDeviceSelect.value
+      ? { deviceId: { exact: micDeviceSelect.value } }
+      : true;
+    stream = await navigator.mediaDevices.getUserMedia({ audio });
   } catch (error) {
     listening = false;
-    if (activeMicStream) {
-      activeMicStream.getTracks().forEach((track) => track.stop());
-      activeMicStream = null;
+    updateMicStatus(window.electronAPI.getMicrophoneErrorMessage(error.name), "error");
+    addErrorMessage(window.electronAPI.getMicrophoneErrorMessage(error.name));
+    return;
+  }
+
+  activeMicStream = stream;
+  await populateMicrophoneDevices();
+  listening = true;
+  startListeningButton.disabled = true;
+  stopListeningButton.disabled = false;
+  transcriptBuffer = questionInput.value.trim();
+  updateMicStatus("Listening…", "ready");
+
+  if (speechRecognition) {
+    try {
+      speechRecognition.stop();
+    } catch (error) {
+      // Recognition may already be stopped.
     }
-    updateMicStatus("Microphone permission denied");
-    addErrorMessage(`Microphone access failed: ${error.message}`);
+  }
+
+  const recognition = new SpeechRecognitionAPI();
+  speechRecognition = recognition;
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.lang = "en-US";
+
+  recognition.onresult = (event) => {
+    let interimTranscript = "";
+    for (let index = event.resultIndex; index < event.results.length; index += 1) {
+      const resultItem = event.results[index];
+      if (resultItem.isFinal) {
+        transcriptBuffer = `${transcriptBuffer} ${resultItem[0].transcript}`.trim();
+        updateMicStatus("Transcript ready", "ready");
+      } else {
+        interimTranscript += resultItem[0].transcript;
+      }
+    }
+    questionInput.value = `${transcriptBuffer} ${interimTranscript}`.trim();
+  };
+
+  recognition.onerror = (event) => {
+    const error = window.electronAPI.getSpeechRecognitionErrorMessage(event.error);
+    if (error.terminal) stopListening();
+    updateMicStatus(error.status, error.message ? "error" : "");
+    if (error.message) addErrorMessage(error.message);
+  };
+
+  recognition.onend = () => {
+    if (!listening) return;
+    window.clearTimeout(speechRestartTimer);
+    speechRestartTimer = window.setTimeout(() => {
+      if (!listening) return;
+      try {
+        recognition.start();
+      } catch (error) {
+        const detail = window.electronAPI.getSpeechRecognitionErrorMessage(error.name);
+        stopListening();
+        updateMicStatus(detail.status, "error");
+        if (detail.message) addErrorMessage(detail.message);
+      }
+    }, 350);
+  };
+
+  try {
+    recognition.start();
+  } catch (error) {
+    const detail = window.electronAPI.getSpeechRecognitionErrorMessage(error.name);
+    stopListening();
+    updateMicStatus(detail.status, "error");
+    if (detail.message) addErrorMessage(detail.message);
   }
 }
 
 function stopListening() {
   listening = false;
+  startListeningButton.disabled = false;
+  stopListeningButton.disabled = true;
+  window.clearTimeout(speechRestartTimer);
   if (speechRecognition) {
     try {
       speechRecognition.stop();

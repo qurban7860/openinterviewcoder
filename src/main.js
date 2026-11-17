@@ -4,12 +4,14 @@ const {
   BrowserWindow,
   globalShortcut,
   ipcMain,
+  session: electronSession,
   screen,
   desktopCapturer,
   Menu,
   Tray,
 } = require("electron");
 const path = require("path");
+const { pathToFileURL } = require("url");
 const {
   ensureScreenRecordingPermission,
   captureFullScreen,
@@ -155,11 +157,20 @@ ipcMain.handle("get-recent-screenshots", () => {
 });
 
 ipcMain.handle("save-uploaded-screenshot", async (_event, payload = {}) => {
-  if (!payload || !Buffer.isBuffer(payload.buffer)) {
+  const uploadedData = payload && payload.buffer;
+  const isBinaryData =
+    Buffer.isBuffer(uploadedData) ||
+    uploadedData instanceof ArrayBuffer ||
+    ArrayBuffer.isView(uploadedData);
+  if (!isBinaryData) {
     throw new Error("A screenshot file upload is required.");
   }
+  const buffer = Buffer.from(uploadedData);
+  if (!buffer.length || buffer.length > 20 * 1024 * 1024) {
+    throw new Error("Choose an image smaller than 20 MB.");
+  }
   const fileName = typeof payload.fileName === "string" ? payload.fileName : "upload.png";
-  return saveUploadedScreenshot(fileName, payload.buffer);
+  return saveUploadedScreenshot(fileName, buffer);
 });
 
 // IPC handlers for window controls
@@ -307,6 +318,20 @@ function createInvisibleWindow() {
 
   // Show window initially
   invisibleWindow.showInactive();
+}
+
+function configureMicrophonePermissions() {
+  const trustedPage = pathToFileURL(path.join(app.getAppPath(), "index.html")).href;
+  electronSession.defaultSession.setPermissionRequestHandler(
+    (webContents, permission, callback, details = {}) => {
+      const requestsAudio =
+        permission === "media" &&
+        Array.isArray(details.mediaTypes) &&
+        details.mediaTypes.includes("audio") &&
+        !details.mediaTypes.includes("video");
+      callback(webContents.getURL() === trustedPage && requestsAudio);
+    }
+  );
 }
 
 function createSettingsWindow() {
@@ -479,6 +504,7 @@ function registerShortcuts() {
 
 // When app is ready
 app.whenReady().then(() => {
+  configureMicrophonePermissions();
   try {
     config.migrateLegacyOpenAIKey();
   } catch (error) {

@@ -7,7 +7,7 @@ An AI-powered coding assistant that helps you during screen sharing sessions. Th
 - Floating assistant overlay designed for screen-sharing workflows
 - Real-time AI assistance for coding questions and interview prep
 - Text-only assistant responses in the chat window
-- Microphone listening with browser-based speech recognition for question capture
+- Microphone capture with browser speech recognition for question transcription
 - Screenshot analysis capabilities for supported vision-capable models
 - Interview session context fields for role, company, background summary, and job description
 - Provider selection for OpenAI, Google Gemini, and Anthropic
@@ -149,8 +149,11 @@ and OpenAI requests use GPT-4o mini.
 
 The app currently supports text-only responses in chat, with microphone capture
 implemented as an input workflow instead of spoken playback. Speech recognition
-uses the browser's Web Speech API when available, and the app never emits an
-audio response by default.
+uses the browser's Web Speech API when available. Depending on the Electron
+runtime, recognition may require an internet connection and a supported speech
+service; a network failure is reported separately from microphone connection or
+permission problems. Typing remains available as a fallback, and the app never
+emits an audio response by default.
 
 Windows builds disable electron-builder's executable-editing helper because
 that helper requires symbolic-link privileges when extracting on some Windows

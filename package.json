@@ -13,8 +13,8 @@
     "build:mac": "electron-builder --mac",
     "build:win": "electron-builder --win --config.win.signAndEditExecutable=false",
     "build:win:local": "electron-builder --win --config.win.signAndEditExecutable=false",
-    "build:win:install": "npm run build:win && start dist\\\"Open Interview Coder Setup 0.1.0.exe\"",
-    "install:win": "start dist\\\"Open Interview Coder Setup 0.1.0.exe\"",
+    "build:win:install": "npm run build:win && npm run install:win",
+    "install:win": "powershell -NoProfile -Command \"$installer = Get-ChildItem dist -Filter '*Setup*.exe' | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if (-not $installer) { throw 'Windows installer not found in dist.' }; Start-Process -FilePath $installer.FullName -Wait\"",
     "build:linux": "electron-builder --linux"
   },
   "dependencies": {

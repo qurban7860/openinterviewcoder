@@ -72,6 +72,36 @@ button {
   background: rgba(19, 25, 36, 0.8);
 }
 
+.session-config-panel {
+  flex: 0 0 auto;
+  padding: 8px 15px 0;
+  background: rgba(19, 25, 36, 0.8);
+}
+
+.session-config-panel > summary {
+  overflow: hidden;
+  min-height: 30px;
+  padding: 7px 10px;
+  border: 1px solid rgba(165, 183, 212, 0.2);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.035);
+  color: #e0e8f6;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-config-panel > summary::marker {
+  color: #a9bcf7;
+}
+
+.session-config-panel[open] > summary {
+  margin-bottom: 4px;
+  border-color: rgba(139, 162, 232, 0.36);
+}
+
 .toolbar-row {
   display: flex;
   justify-content: flex-end;
@@ -126,6 +156,17 @@ button {
   color: #edf1f8;
   font-size: 11px;
   resize: vertical;
+}
+
+.session-field select,
+.session-select,
+.mic-device-select {
+  color-scheme: dark;
+}
+
+select option {
+  background: #1b2432;
+  color: #f0f4fb;
 }
 
 .session-field textarea {
@@ -311,7 +352,7 @@ button {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 18px 0 24px;
+  padding: 14px 0 20px;
   text-align: center;
 }
 
@@ -347,9 +388,8 @@ button {
 .welcome-state h1 {
   margin: 9px 0 7px;
   color: #f3f5fa;
-  font-size: clamp(21px, 5vw, 27px);
+  font-size: 23px;
   font-weight: 650;
-  letter-spacing: -0.045em;
 }
 
 .welcome-state > p {
@@ -369,13 +409,20 @@ button {
 
 .focus-areas {
   display: grid;
+  max-height: 180px;
   gap: 8px;
+  overflow-y: auto;
   width: min(100%, 330px);
   margin-top: 16px;
   padding: 10px 12px;
   border: 1px solid rgba(163, 182, 224, 0.18);
   border-radius: 12px;
   background: rgba(17, 24, 36, 0.52);
+  text-align: left;
+}
+
+.focus-areas[hidden] {
+  display: none;
 }
 
 .focus-areas-title {
@@ -451,7 +498,7 @@ kbd {
   border: 1px solid var(--border);
   border-radius: 13px;
   animation: message-in 180ms ease-out;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.65;
   overflow-wrap: anywhere;
 }
@@ -467,9 +514,10 @@ kbd {
 
 .message.assistant {
   align-self: flex-start;
+  border-color: rgba(167, 187, 220, 0.2);
   border-bottom-left-radius: 5px;
-  background: var(--surface-raised);
-  color: #dbe1eb;
+  background: #192230;
+  color: #f0f3f8;
 }
 
 .message.error {
@@ -595,6 +643,7 @@ kbd {
 }
 
 .composer-area {
+  flex: 0 0 auto;
   padding: 11px 15px 12px;
   border-top: 1px solid var(--border);
   background: rgba(15, 20, 29, 0.96);
@@ -602,6 +651,7 @@ kbd {
 
 .audio-tools {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   padding: 8px 3px 0;
@@ -646,10 +696,24 @@ kbd {
   color: #dfe7f4;
 }
 
+.microphone-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
 .mic-status {
   margin-left: 4px;
-  color: #8a96ad;
+  color: #b6c1d2;
   font-size: 10px;
+  line-height: 1.4;
+}
+
+.mic-status[data-state="error"] {
+  color: #ffb1ab;
+}
+
+.mic-status[data-state="ready"] {
+  color: #9de0c1;
 }
 
 .question-form {

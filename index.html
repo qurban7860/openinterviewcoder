@@ -58,7 +58,9 @@
         </div>
         <button id="new-session-button" class="session-button" type="button">New session</button>
       </header>
-      <section class="session-config" aria-label="Interview session metadata">
+      <details id="session-config-panel" class="session-config-panel">
+        <summary id="session-details-summary">Interview details · Add role context</summary>
+        <section class="session-config" aria-label="Interview session metadata">
         <div class="session-field">
           <label for="session-name-input">Name</label>
           <input id="session-name-input" type="text" placeholder="Frontend round" />
@@ -89,8 +91,9 @@
           <label for="session-job-description-input">Job description</label>
           <textarea id="session-job-description-input" rows="3" placeholder="Role goals, requirements, and interview focus"></textarea>
         </div>
-        <button id="save-session-meta" class="save-session-button" type="button">Save session details</button>
-      </section>
+          <button id="save-session-meta" class="save-session-button" type="button">Save details</button>
+        </section>
+      </details>
       <div class="toolbar-row">
         <label class="upload-button" for="manual-screenshot-upload">Upload screenshot</label>
         <input id="manual-screenshot-upload" type="file" accept="image/*" hidden />
@@ -113,7 +116,7 @@
             <option value="">Detecting microphones…</option>
           </select>
           <button id="start-listening" type="button" class="microphone-button">Listen</button>
-          <button id="stop-listening" type="button" class="microphone-button secondary-button">Stop</button>
+          <button id="stop-listening" type="button" class="microphone-button secondary-button" disabled>Stop</button>
           <button id="transcript-apply-button" type="button" class="microphone-button secondary-button">Use transcript</button>
           <span id="mic-status" class="mic-status">Microphone off</span>
         </div>
