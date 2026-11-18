@@ -2,10 +2,7 @@ const chatHistory = document.getElementById("chat-history");
 const typingIndicator = document.getElementById("typing-indicator");
 const questionInput = document.getElementById("question-input");
 const questionForm = document.getElementById("question-form");
-const micDeviceSelect = document.getElementById("mic-device-select");
 const startListeningButton = document.getElementById("start-listening");
-const stopListeningButton = document.getElementById("stop-listening");
-const transcriptApplyButton = document.getElementById("transcript-apply-button");
 const micStatus = document.getElementById("mic-status");
 const sessionSelect = document.getElementById("session-select");
 const newSessionButton = document.getElementById("new-session-button");
@@ -21,7 +18,6 @@ const manualScreenshotUpload = document.getElementById("manual-screenshot-upload
 let messages = [];
 let pendingRequests = 0;
 const pendingMessageIds = new Set();
-let transcriptBuffer = "";
 let listening = false;
 let activeMicStream = null;
 let activeSessionId = null;
@@ -38,8 +34,7 @@ if (typeof marked !== "undefined") {
 document.addEventListener("DOMContentLoaded", setupEventListeners);
 
 async function setupEventListeners() {
-  stopListeningButton.disabled = true;
-  transcriptApplyButton.disabled = true;
+  setMicrophoneButtonState();
   document.querySelectorAll(".modifier-key").forEach((key) => {
     if (window.electronAPI.platform === "darwin") key.textContent = "⌘";
   });
@@ -80,22 +75,9 @@ async function setupEventListeners() {
   document.getElementById("clear-chat-button").addEventListener("click", () => {
     resetChat();
   });
-  startListeningButton.addEventListener("click", startListening);
-  stopListeningButton.addEventListener("click", stopListening);
-  micDeviceSelect.addEventListener("change", () => {
+  startListeningButton.addEventListener("click", () => {
     if (listening) stopListening();
-  });
-  transcriptApplyButton.addEventListener("click", () => {
-    const transcript = transcriptBuffer.trim();
-    if (!transcript) {
-      addErrorMessage("No microphone transcript is ready to send yet.");
-      return;
-    }
-    questionInput.value = transcript;
-    transcriptApplyButton.disabled = true;
-    questionForm.requestSubmit();
-    transcriptBuffer = "";
-    updateMicStatus("Transcript sent");
+    else startListening();
   });
 
   newSessionButton.addEventListener("click", createSessionFromUI);
@@ -115,7 +97,6 @@ async function setupEventListeners() {
       questionForm.requestSubmit();
     });
   });
-  populateMicrophoneDevices();
   await hydrateSessions();
   window.electronAPI.getSettings().then(updateProviderBadge).catch((error) => {
     addErrorMessage(`Couldn't load provider settings: ${error.message}`);
@@ -388,47 +369,23 @@ async function renderSessionMessages(session = null) {
   scrollToBottom();
 }
 
-async function populateMicrophoneDevices() {
-  if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
-    updateMicStatus("Microphone access unavailable in this browser");
-    return;
-  }
-
-  try {
-    const selectedDeviceId = micDeviceSelect.value;
-    const devices = await navigator.mediaDevices.enumerateDevices();
-    const audioInputs = devices.filter((device) => device.kind === "audioinput");
-    if (!audioInputs.length) {
-      const option = document.createElement('option');
-      option.value = '';
-      option.textContent = 'No microphone detected';
-      micDeviceSelect.replaceChildren(option);
-      updateMicStatus("No microphone detected", "error");
-      return;
-    }
-
-    micDeviceSelect.replaceChildren();
-    audioInputs.forEach((device, index) => {
-      const option = document.createElement('option');
-      option.value = device.deviceId || '';
-      option.textContent = device.label || `Microphone ${index + 1}`;
-      option.selected = device.deviceId === selectedDeviceId;
-      micDeviceSelect.appendChild(option);
-    });
-    if (selectedDeviceId && !audioInputs.some((device) => device.deviceId === selectedDeviceId)) {
-      micDeviceSelect.selectedIndex = 0;
-    }
-    updateMicStatus("Microphone ready", "ready");
-  } catch (error) {
-    updateMicStatus("Microphone access unavailable", "error");
-    console.error("Unable to enumerate microphone devices:", error);
-  }
-}
-
 function updateMicStatus(message, state = "") {
   if (!micStatus) return;
   micStatus.textContent = message;
   micStatus.dataset.state = state || (listening ? "ready" : "");
+}
+
+function setMicrophoneButtonState({ recording = false, disabled = false } = {}) {
+  startListeningButton.classList.toggle("is-recording", recording);
+  startListeningButton.setAttribute("aria-pressed", String(recording));
+  startListeningButton.setAttribute(
+    "aria-label",
+    recording ? "Stop recording" : "Start recording"
+  );
+  startListeningButton.title = recording
+    ? "Stop recording and transcribe"
+    : "Record a spoken question";
+  startListeningButton.disabled = disabled;
 }
 
 async function startListening() {
@@ -445,17 +402,13 @@ async function startListening() {
     return;
   }
 
-  startListeningButton.disabled = true;
-  transcriptApplyButton.disabled = true;
+  setMicrophoneButtonState({ disabled: true });
   let stream;
   try {
-    const audio = micDeviceSelect.value
-      ? { deviceId: { exact: micDeviceSelect.value } }
-      : true;
-    stream = await navigator.mediaDevices.getUserMedia({ audio });
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
   } catch (error) {
     listening = false;
-    startListeningButton.disabled = false;
+    setMicrophoneButtonState();
     const message = await window.electronAPI.getMicrophoneErrorMessage(error.name);
     updateMicStatus(message, "error");
     addErrorMessage(message);
@@ -463,7 +416,6 @@ async function startListening() {
   }
 
   activeMicStream = stream;
-  await populateMicrophoneDevices();
   audioChunks = [];
   audioBytesRecorded = 0;
   audioLimitExceeded = false;
@@ -484,17 +436,15 @@ async function startListening() {
   } catch (error) {
     stream.getTracks().forEach((track) => track.stop());
     activeMicStream = null;
-    startListeningButton.disabled = false;
+    setMicrophoneButtonState();
     updateMicStatus("Could not start microphone recording", "error");
     addErrorMessage(`Microphone recording failed: ${error.message}`);
     return;
   }
 
   listening = true;
-  micDeviceSelect.disabled = true;
-  stopListeningButton.disabled = false;
-  transcriptBuffer = "";
-  updateMicStatus("Recording… select Stop to transcribe", "ready");
+  setMicrophoneButtonState({ recording: true });
+  updateMicStatus("Recording… click the microphone again to transcribe", "ready");
   mediaRecorder.ondataavailable = (event) => {
     if (!event.data || event.data.size === 0) return;
     audioBytesRecorded += event.data.size;
@@ -508,9 +458,7 @@ async function startListening() {
   mediaRecorder.onerror = (event) => {
     stopRecordingTracks();
     listening = false;
-    startListeningButton.disabled = false;
-    stopListeningButton.disabled = true;
-    micDeviceSelect.disabled = false;
+    setMicrophoneButtonState();
     updateMicStatus("Audio recording failed", "error");
     addErrorMessage(`Audio recording failed: ${event.error?.message || "unknown recorder error"}`);
   };
@@ -527,9 +475,7 @@ async function startListening() {
   } catch (error) {
     stopRecordingTracks();
     listening = false;
-    startListeningButton.disabled = false;
-    stopListeningButton.disabled = true;
-    micDeviceSelect.disabled = false;
+    setMicrophoneButtonState();
     updateMicStatus("Could not start microphone recording", "error");
     addErrorMessage(`Microphone recording failed: ${error.message}`);
   }
@@ -538,14 +484,13 @@ async function startListening() {
 function stopListening() {
   if (!mediaRecorder || mediaRecorder.state !== "recording") return;
   listening = false;
-  stopListeningButton.disabled = true;
+  setMicrophoneButtonState({ disabled: true });
   updateMicStatus("Preparing audio for transcription…", "ready");
   try {
     mediaRecorder.stop();
   } catch (error) {
     stopRecordingTracks();
-    startListeningButton.disabled = false;
-    micDeviceSelect.disabled = false;
+    setMicrophoneButtonState();
     updateMicStatus("Could not stop microphone recording", "error");
     addErrorMessage(`Could not finish the microphone recording: ${error.message}`);
   }
@@ -553,8 +498,7 @@ function stopListening() {
 
 async function transcribeRecording() {
   listening = false;
-  stopListeningButton.disabled = true;
-  micDeviceSelect.disabled = false;
+  setMicrophoneButtonState({ disabled: true });
   stopRecordingTracks();
   const mimeType = mediaRecorder?.mimeType || audioChunks[0]?.type || "audio/webm";
   const blob = new Blob(audioChunks, { type: mimeType });
@@ -562,21 +506,21 @@ async function transcribeRecording() {
 
   if (audioLimitExceeded) {
     audioLimitExceeded = false;
-    startListeningButton.disabled = false;
+    setMicrophoneButtonState();
     updateMicStatus("Recording is too large", "error");
     addErrorMessage("Audio recordings must be smaller than 20 MB. Record a shorter clip and retry.");
     return;
   }
 
   if (!blob.size) {
-    startListeningButton.disabled = false;
+    setMicrophoneButtonState();
     updateMicStatus("No audio captured", "error");
     addErrorMessage("No audio was captured. Check the selected microphone and try again.");
     return;
   }
 
   if (blob.size > 20 * 1024 * 1024) {
-    startListeningButton.disabled = false;
+    setMicrophoneButtonState();
     updateMicStatus("Recording is too large", "error");
     addErrorMessage("Audio recordings must be smaller than 20 MB. Record a shorter clip and retry.");
     return;
@@ -589,21 +533,21 @@ async function transcribeRecording() {
       audio: new Uint8Array(await blob.arrayBuffer()),
       mimeType: blob.type || mimeType,
     });
-    transcriptBuffer = [recordingDraft, result.transcript.trim()].filter(Boolean).join(" ");
-    questionInput.value = transcriptBuffer;
-    transcriptApplyButton.disabled = !transcriptBuffer;
+    const transcript = result.transcript.trim();
+    questionInput.value = [recordingDraft, transcript].filter(Boolean).join(" ");
+    questionInput.focus();
     updateMicStatus(
-      transcriptBuffer ? `Transcript ready · ${result.provider}` : "No speech detected",
-      transcriptBuffer ? "ready" : "error"
+      transcript ? `Transcript ready · ${result.provider} · review, then Send` : "No speech detected",
+      transcript ? "ready" : "error"
     );
-    if (!transcriptBuffer) {
+    if (!transcript) {
       addErrorMessage("No speech was detected. Try a longer recording or check your microphone input level.");
     }
   } catch (error) {
     updateMicStatus("Transcription failed", "error");
     addErrorMessage(error.message);
   } finally {
-    startListeningButton.disabled = false;
+    setMicrophoneButtonState();
     setRequestPending(false);
   }
 }

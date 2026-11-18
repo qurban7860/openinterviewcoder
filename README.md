@@ -114,8 +114,8 @@ The built applications will be available in the `dist` directory.
 
 1. Launch the application
 2. Add the role, company, candidate background summary, and job description in the session metadata so the assistant can ground interview answers in your actual context.
-3. Select a microphone and click Listen to record your question, then click Stop to transcribe it with the configured provider.
-4. Review the transcript in the composer and click Use transcript to send it into the chat.
+3. Click the microphone icon to start recording; click it again to stop and transcribe.
+4. Review or edit the transcript in the chat composer, then press Send when ready.
 5. Use the keyboard shortcuts to control the assistant:
 
    - `Cmd/Ctrl + Shift + S`: Capture and analyze a screenshot
@@ -171,7 +171,7 @@ code-signing certificate.
 | Text generation | ✅ | ✅ | ✅ |
 | Streaming responses | ✅ | ✅ | ✅ |
 | Vision / screenshot analysis | ✅ | ✅ | ✅ |
-| Browser transcription | ⚠️ via local speech API | ⚠️ via local speech API | ⚠️ via local speech API |
+| Audio transcription | ✅ | ✅ | Uses a configured OpenAI or Gemini key |
 | Default model | GPT-4o mini | Gemini 2.5 Flash Lite | Claude Haiku 5.5 |
 
 ## Contributing

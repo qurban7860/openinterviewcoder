@@ -159,8 +159,7 @@ button {
 }
 
 .session-field select,
-.session-select,
-.mic-device-select {
+.session-select {
   color-scheme: dark;
 }
 
@@ -658,42 +657,56 @@ kbd {
   color: #b7c4d6;
 }
 
-.mic-label {
-  color: #8fa6d0;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.mic-device-select {
-  min-width: 120px;
-  max-width: 170px;
-  height: 28px;
-  padding: 0 8px;
-  border: 1px solid rgba(165, 183, 212, 0.17);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.025);
-  color: #edf1f8;
-  font-size: 11px;
-}
-
 .microphone-button {
-  min-height: 28px;
-  padding: 0 10px;
-  border: 1px solid rgba(139, 162, 232, 0.26);
-  border-radius: 8px;
-  background: rgba(103, 136, 228, 0.18);
-  color: #dfe7ff;
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  place-items: center;
+  border: 1px solid rgba(139, 162, 232, 0.4);
+  border-radius: 50%;
+  background: rgba(103, 136, 228, 0.2);
+  color: #e6edff;
   cursor: pointer;
-  font-size: 10px;
-  font-weight: 700;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
 }
 
-.microphone-button.secondary-button {
-  background: rgba(255, 255, 255, 0.03);
-  border-color: rgba(165, 183, 212, 0.17);
-  color: #dfe7f4;
+.microphone-button:hover:not(:disabled) {
+  border-color: rgba(156, 177, 255, 0.8);
+  background: rgba(103, 136, 228, 0.36);
+}
+
+.mic-symbol {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.mic-stop-symbol {
+  display: none;
+  width: 11px;
+  height: 11px;
+  border-radius: 2px;
+  background: currentColor;
+}
+
+.mic-toggle.is-recording {
+  border-color: rgba(255, 132, 132, 0.72);
+  background: #a9353e;
+  color: #fff;
+  animation: recording-pulse 1.4s ease-in-out infinite;
+}
+
+.mic-toggle.is-recording .mic-symbol {
+  display: none;
+}
+
+.mic-toggle.is-recording .mic-stop-symbol {
+  display: block;
 }
 
 .microphone-button:disabled {
@@ -714,6 +727,10 @@ kbd {
 
 .mic-status[data-state="ready"] {
   color: #9de0c1;
+}
+
+@keyframes recording-pulse {
+  50% { box-shadow: 0 0 0 5px rgba(232, 80, 85, 0.16); }
 }
 
 .question-form {

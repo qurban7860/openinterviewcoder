@@ -3,6 +3,8 @@ const assert = require('node:assert/strict');
 
 const {
   buildOpenAIMultipartBody,
+  buildGeminiAudioInput,
+  buildGeminiTranscriptionRequest,
   getTranscriptionProvider,
   normalizeAudioUpload,
 } = require('../src/audio-transcription');
@@ -35,4 +37,32 @@ test('uses the active transcription provider or configured speech provider for C
   assert.equal(getTranscriptionProvider('openai', ['openai']), 'openai');
   assert.equal(getTranscriptionProvider('anthropic', ['anthropic', 'gemini']), 'gemini');
   assert.equal(getTranscriptionProvider('anthropic', ['anthropic']), null);
+});
+
+test('builds Gemini Interactions API audio input with matching MIME type and bytes', () => {
+  const upload = normalizeAudioUpload(Buffer.from([4, 5, 6]), 'audio/webm');
+  const input = buildGeminiAudioInput(upload);
+
+  assert.equal(input[0].type, 'text');
+  assert.match(input[0].text, /transcribe/i);
+  assert.deepEqual(input[1], {
+    type: 'audio',
+    data: Buffer.from([4, 5, 6]).toString('base64'),
+    mime_type: 'audio/webm',
+  });
+});
+
+test('uses the supported Gemini Flash model without storing audio interactions', () => {
+  const upload = normalizeAudioUpload(Buffer.from([7, 8]), 'audio/webm');
+  const request = buildGeminiTranscriptionRequest(upload);
+
+  assert.equal(request.model, 'gemini-3.8-flash');
+  assert.equal(request.store, false);
+  assert.equal(request.input[1].type, 'audio');
+});
+
+test('rejects Gemini inline audio that would exceed the total request limit', () => {
+  const upload = normalizeAudioUpload(Buffer.alloc(14 * 1024 * 1024 + 1), 'audio/webm');
+
+  assert.throws(() => buildGeminiTranscriptionRequest(upload), /shorter than 14 MB/i);
 });

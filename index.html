@@ -111,13 +111,10 @@
           </button>
         </form>
         <div class="audio-tools" aria-label="Microphone controls">
-          <label for="mic-device-select" class="mic-label">Mic</label>
-          <select id="mic-device-select" class="mic-device-select">
-            <option value="">Detecting microphones…</option>
-          </select>
-          <button id="start-listening" type="button" class="microphone-button" title="Record microphone audio, then select Stop to transcribe">Listen</button>
-          <button id="stop-listening" type="button" class="microphone-button secondary-button" disabled>Stop</button>
-          <button id="transcript-apply-button" type="button" class="microphone-button secondary-button" disabled>Use transcript</button>
+          <button id="start-listening" type="button" class="microphone-button mic-toggle" title="Start recording a spoken question" aria-label="Start recording" aria-pressed="false">
+            <svg class="mic-symbol" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v3m-4 0h8"/></svg>
+            <span class="mic-stop-symbol" aria-hidden="true"></span>
+          </button>
           <span id="mic-status" class="mic-status" role="status" aria-live="polite">Microphone off</span>
         </div>
         <div class="composer-footer">
