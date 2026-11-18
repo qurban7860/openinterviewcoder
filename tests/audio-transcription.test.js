@@ -5,7 +5,9 @@ const {
   buildOpenAIMultipartBody,
   buildGeminiAudioInput,
   buildGeminiTranscriptionRequest,
+  GEMINI_TRANSCRIPTION_MODELS,
   getTranscriptionProvider,
+  getGeminiRetryAction,
   normalizeAudioUpload,
 } = require('../src/audio-transcription');
 
@@ -59,10 +61,27 @@ test('uses the supported Gemini Flash model without storing audio interactions',
   assert.equal(request.model, 'gemini-3.8-flash');
   assert.equal(request.store, false);
   assert.equal(request.input[1].type, 'audio');
+  assert.deepEqual(GEMINI_TRANSCRIPTION_MODELS, [
+    'gemini-3.8-flash',
+    'gemini-3.6-flash',
+    'gemini-3.5-flash-lite',
+  ]);
 });
 
 test('rejects Gemini inline audio that would exceed the total request limit', () => {
   const upload = normalizeAudioUpload(Buffer.alloc(14 * 1024 * 1024 + 1), 'audio/webm');
 
   assert.throws(() => buildGeminiTranscriptionRequest(upload), /shorter than 14 MB/i);
+});
+
+test('retries one transient Gemini overload, then falls back to another model', () => {
+  assert.equal(getGeminiRetryAction(503, 0), 'retry');
+  assert.equal(getGeminiRetryAction(503, 1), 'fallback');
+  assert.equal(getGeminiRetryAction(429, 0), 'retry');
+});
+
+test('falls back for an unavailable Gemini model but does not retry auth or input errors', () => {
+  assert.equal(getGeminiRetryAction(404, 0), 'fallback');
+  assert.equal(getGeminiRetryAction(401, 0), 'throw');
+  assert.equal(getGeminiRetryAction(400, 0), 'throw');
 });

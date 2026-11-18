@@ -6,8 +6,10 @@ const { randomBytes, randomUUID } = require("crypto");
 const config = require("./config");
 const {
   MAX_AUDIO_BYTES,
+  GEMINI_TRANSCRIPTION_MODELS,
   buildGeminiTranscriptionRequest,
   buildOpenAIMultipartBody,
+  getGeminiRetryAction,
   getTranscriptionProvider,
   normalizeAudioUpload,
 } = require("./audio-transcription");
@@ -135,28 +137,56 @@ async function transcribeWithOpenAI(apiKey, upload) {
 }
 
 async function transcribeWithGemini(apiKey, upload) {
-  const response = await axios.post(
-    "https://generativelanguage.googleapis.com/v1beta/interactions",
-    buildGeminiTranscriptionRequest(upload),
-    {
-      timeout: 120000,
-      maxBodyLength: MAX_AUDIO_BYTES * 1.4,
-      headers: {
-        "x-goog-api-key": apiKey,
-        "Api-Revision": "2026-05-20",
-      },
+  const failures = [];
+  for (const model of GEMINI_TRANSCRIPTION_MODELS) {
+    let response;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        response = await axios.post(
+          "https://generativelanguage.googleapis.com/v1beta/interactions",
+          buildGeminiTranscriptionRequest(upload, model),
+          {
+            timeout: 120000,
+            maxBodyLength: MAX_AUDIO_BYTES * 1.4,
+            headers: {
+              "x-goog-api-key": apiKey,
+              "Api-Revision": "2026-05-20",
+            },
+          }
+        );
+        break;
+      } catch (error) {
+        const status = error.response?.status;
+        const action = getGeminiRetryAction(status, attempt);
+        if (action === "retry") {
+          await new Promise((resolve) => setTimeout(resolve, status === 429 ? 1000 : 500));
+          continue;
+        }
+        if (action === "fallback") {
+          const reason = error.response?.data?.error?.message || error.message;
+          failures.push(`${model} (${status}): ${reason}`);
+          break;
+        }
+        throw error;
+      }
     }
+    if (!response) continue;
+
+    const text = (response.data.output_text
+      ? [response.data.output_text]
+      : (response.data.steps || [])
+          .filter((step) => step.type === "model_output")
+          .flatMap((step) => step.content || [])
+          .filter((part) => part.type === "text")
+          .map((part) => part.text || ""))
+      .join(" ")
+      .trim();
+    return { text, model };
+  }
+
+  throw new Error(
+    `Gemini transcription is temporarily unavailable. Retried overloaded models and tried ${GEMINI_TRANSCRIPTION_MODELS.join(", ")}. Please try again later. ${failures.join(" | ")}`
   );
-  const text = (response.data.output_text
-    ? [response.data.output_text]
-    : (response.data.steps || [])
-        .filter((step) => step.type === "model_output")
-        .flatMap((step) => step.content || [])
-        .filter((part) => part.type === "text")
-        .map((part) => part.text || ""))
-    .join(" ")
-    .trim();
-  return { text, model: "gemini-3.8-flash" };
 }
 
 async function readScreenshot(filePath) {

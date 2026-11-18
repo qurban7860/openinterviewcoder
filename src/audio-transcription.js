@@ -1,5 +1,10 @@
 const MAX_AUDIO_BYTES = 20 * 1024 * 1024;
 const MAX_GEMINI_INLINE_AUDIO_BYTES = 14 * 1024 * 1024;
+const GEMINI_TRANSCRIPTION_MODELS = [
+  'gemini-3.8-flash',
+  'gemini-3.6-flash',
+  'gemini-3.5-flash-lite',
+];
 
 const AUDIO_FORMATS = {
   'audio/aac': 'aac',
@@ -72,15 +77,23 @@ function buildGeminiAudioInput(upload) {
   ];
 }
 
-function buildGeminiTranscriptionRequest(upload) {
+function buildGeminiTranscriptionRequest(upload, model = GEMINI_TRANSCRIPTION_MODELS[0]) {
   if (upload.buffer.length > MAX_GEMINI_INLINE_AUDIO_BYTES) {
     throw new Error('Gemini inline audio must be shorter than 14 MB. Record a shorter clip and retry.');
   }
   return {
-    model: 'gemini-3.8-flash',
+    model,
     input: buildGeminiAudioInput(upload),
     store: false,
   };
+}
+
+function getGeminiRetryAction(status, attempt) {
+  if (status === 404) return 'fallback';
+  if ([429, 500, 502, 503, 504].includes(status)) {
+    return attempt === 0 ? 'retry' : 'fallback';
+  }
+  return 'throw';
 }
 
 function getTranscriptionProvider(activeProvider, configuredProviders = []) {
@@ -92,9 +105,11 @@ function getTranscriptionProvider(activeProvider, configuredProviders = []) {
 module.exports = {
   MAX_AUDIO_BYTES,
   MAX_GEMINI_INLINE_AUDIO_BYTES,
+  GEMINI_TRANSCRIPTION_MODELS,
   buildGeminiAudioInput,
   buildGeminiTranscriptionRequest,
   buildOpenAIMultipartBody,
+  getGeminiRetryAction,
   getTranscriptionProvider,
   normalizeAudioUpload,
 };
