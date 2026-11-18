@@ -173,27 +173,43 @@ function renderSuggestions(session = {}) {
       'How did you validate success and learn from the risks or bottlenecks in this work?',
     ],
   };
+  const suggestionTitles = {
+    general: ['Explain a concept', 'Work through a problem', 'Review code'],
+    'coding-interview': ['Clarify constraints', 'Explore edge cases', 'Test the approach'],
+    'system-design': ['Sketch the architecture', 'Map components and failures', 'Plan for scale'],
+    behavioral: ['Build a STAR answer', 'Discuss a hard trade-off', 'Show collaboration'],
+    'project-discussion': ['Tell the project story', 'Explain the trade-offs', 'Reflect on impact'],
+  };
 
   const list = modeSuggestions[values.mode] || defaultSuggestions;
+  const titles = suggestionTitles[values.mode] || suggestionTitles.general;
   suggestionsContainer.replaceChildren();
-  for (const question of list) {
+  list.forEach((question, index) => {
     const button = document.createElement('button');
     button.className = 'suggestion';
     button.type = 'button';
     button.dataset.question = question;
-    const label = document.createElement('span');
-    label.className = 'suggestion-label';
-    label.textContent = question.length > 80 ? `${question.slice(0, 77)}...` : question;
+    button.title = question;
+    const copy = document.createElement('span');
+    copy.className = 'suggestion-copy';
+    const title = document.createElement('span');
+    title.className = 'suggestion-title';
+    title.textContent = titles[index] || 'Practice question';
+    const detail = document.createElement('span');
+    detail.className = 'suggestion-detail';
+    detail.textContent = question.length > 116 ? `${question.slice(0, 113)}...` : question;
+    copy.append(title, detail);
     const arrow = document.createElement('span');
+    arrow.className = 'suggestion-arrow';
     arrow.setAttribute('aria-hidden', 'true');
     arrow.textContent = '↗';
-    button.append(label, arrow);
+    button.append(copy, arrow);
     button.addEventListener('click', () => {
       questionInput.value = button.dataset.question;
       questionForm.requestSubmit();
     });
     suggestionsContainer.appendChild(button);
-  }
+  });
 }
 
 function renderFocusAreas(session = {}) {
