@@ -14,48 +14,6 @@ function getMicrophoneErrorMessage(errorName = '') {
   return messages[errorName] || 'Microphone access failed. Check that a device is connected and that operating system permissions allow access.';
 }
 
-function getSpeechRecognitionErrorMessage(errorName = '') {
-  const errors = {
-    network: {
-      message: 'Speech recognition service is unavailable. Check your internet connection and retry. Your microphone is not necessarily disconnected; you can type your question in chat meanwhile.',
-      status: 'Speech service unavailable (network)',
-      terminal: true,
-    },
-    'not-allowed': {
-      message: 'Speech recognition permission was denied. Allow microphone access in operating system settings and retry.',
-      status: 'Microphone permission denied',
-      terminal: true,
-    },
-    'service-not-allowed': {
-      message: 'The browser speech-recognition service is blocked or unavailable. You can type your question in chat instead.',
-      status: 'Speech service unavailable',
-      terminal: true,
-    },
-    'audio-capture': {
-      message: 'Speech recognition could not access the microphone. Check its connection and close other apps using it.',
-      status: 'Microphone unavailable',
-      terminal: true,
-    },
-    'no-speech': {
-      message: 'No speech was detected. Check the selected microphone and input level, then try again.',
-      status: 'No speech detected',
-      terminal: true,
-    },
-    aborted: {
-      message: '',
-      status: 'Listening stopped',
-      terminal: true,
-    },
-  };
-
-  return errors[errorName] || {
-    message: 'Speech recognition stopped unexpectedly. You can retry or type your question in chat.',
-    status: 'Speech recognition stopped',
-    terminal: true,
-  };
-}
-
 module.exports = {
   getMicrophoneErrorMessage,
-  getSpeechRecognitionErrorMessage,
 };

@@ -21,12 +21,15 @@ const manualScreenshotUpload = document.getElementById("manual-screenshot-upload
 let messages = [];
 let pendingRequests = 0;
 const pendingMessageIds = new Set();
-let speechRecognition = null;
 let transcriptBuffer = "";
 let listening = false;
 let activeMicStream = null;
 let activeSessionId = null;
-let speechRestartTimer = null;
+let mediaRecorder = null;
+let audioChunks = [];
+let audioBytesRecorded = 0;
+let audioLimitExceeded = false;
+let recordingDraft = "";
 
 if (typeof marked !== "undefined") {
   marked.setOptions({ breaks: true, gfm: true });
@@ -36,6 +39,7 @@ document.addEventListener("DOMContentLoaded", setupEventListeners);
 
 async function setupEventListeners() {
   stopListeningButton.disabled = true;
+  transcriptApplyButton.disabled = true;
   document.querySelectorAll(".modifier-key").forEach((key) => {
     if (window.electronAPI.platform === "darwin") key.textContent = "⌘";
   });
@@ -88,6 +92,7 @@ async function setupEventListeners() {
       return;
     }
     questionInput.value = transcript;
+    transcriptApplyButton.disabled = true;
     questionForm.requestSubmit();
     transcriptBuffer = "";
     updateMicStatus("Transcript sent");
@@ -428,19 +433,20 @@ function updateMicStatus(message, state = "") {
 
 async function startListening() {
   if (listening) return;
-  const SpeechRecognitionAPI =
-    window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRecognitionAPI) {
-    updateMicStatus("Speech recognition is not supported in this browser", "error");
-    addErrorMessage("Speech recognition is not available in this environment. You can still type your question manually.");
+  if (!window.MediaRecorder) {
+    updateMicStatus("Audio recording is not supported", "error");
+    addErrorMessage("This app cannot record audio in the current environment. You can still type your question.");
     return;
   }
 
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    updateMicStatus("Microphone capture is unavailable", "error");
     addErrorMessage("Microphone access is not available. Check your browser or OS permission settings.");
     return;
   }
 
+  startListeningButton.disabled = true;
+  transcriptApplyButton.disabled = true;
   let stream;
   try {
     const audio = micDeviceSelect.value
@@ -449,97 +455,164 @@ async function startListening() {
     stream = await navigator.mediaDevices.getUserMedia({ audio });
   } catch (error) {
     listening = false;
-    updateMicStatus(window.electronAPI.getMicrophoneErrorMessage(error.name), "error");
-    addErrorMessage(window.electronAPI.getMicrophoneErrorMessage(error.name));
+    startListeningButton.disabled = false;
+    const message = await window.electronAPI.getMicrophoneErrorMessage(error.name);
+    updateMicStatus(message, "error");
+    addErrorMessage(message);
     return;
   }
 
   activeMicStream = stream;
   await populateMicrophoneDevices();
-  listening = true;
-  startListeningButton.disabled = true;
-  stopListeningButton.disabled = false;
-  transcriptBuffer = questionInput.value.trim();
-  updateMicStatus("Listening…", "ready");
-
-  if (speechRecognition) {
-    try {
-      speechRecognition.stop();
-    } catch (error) {
-      // Recognition may already be stopped.
-    }
-  }
-
-  const recognition = new SpeechRecognitionAPI();
-  speechRecognition = recognition;
-  recognition.continuous = true;
-  recognition.interimResults = true;
-  recognition.lang = "en-US";
-
-  recognition.onresult = (event) => {
-    let interimTranscript = "";
-    for (let index = event.resultIndex; index < event.results.length; index += 1) {
-      const resultItem = event.results[index];
-      if (resultItem.isFinal) {
-        transcriptBuffer = `${transcriptBuffer} ${resultItem[0].transcript}`.trim();
-        updateMicStatus("Transcript ready", "ready");
-      } else {
-        interimTranscript += resultItem[0].transcript;
-      }
-    }
-    questionInput.value = `${transcriptBuffer} ${interimTranscript}`.trim();
-  };
-
-  recognition.onerror = (event) => {
-    const error = window.electronAPI.getSpeechRecognitionErrorMessage(event.error);
-    if (error.terminal) stopListening();
-    updateMicStatus(error.status, error.message ? "error" : "");
-    if (error.message) addErrorMessage(error.message);
-  };
-
-  recognition.onend = () => {
-    if (!listening) return;
-    window.clearTimeout(speechRestartTimer);
-    speechRestartTimer = window.setTimeout(() => {
-      if (!listening) return;
-      try {
-        recognition.start();
-      } catch (error) {
-        const detail = window.electronAPI.getSpeechRecognitionErrorMessage(error.name);
-        stopListening();
-        updateMicStatus(detail.status, "error");
-        if (detail.message) addErrorMessage(detail.message);
-      }
-    }, 350);
-  };
+  audioChunks = [];
+  audioBytesRecorded = 0;
+  audioLimitExceeded = false;
+  recordingDraft = questionInput.value.trim();
+  const mimeType = typeof MediaRecorder.isTypeSupported === "function"
+    ? [
+        "audio/webm;codecs=opus",
+        "audio/webm",
+        "audio/mp4",
+        "audio/ogg;codecs=opus",
+      ].find((candidate) => MediaRecorder.isTypeSupported(candidate))
+    : undefined;
 
   try {
-    recognition.start();
+    mediaRecorder = mimeType
+      ? new MediaRecorder(stream, { mimeType })
+      : new MediaRecorder(stream);
   } catch (error) {
-    const detail = window.electronAPI.getSpeechRecognitionErrorMessage(error.name);
-    stopListening();
-    updateMicStatus(detail.status, "error");
-    if (detail.message) addErrorMessage(detail.message);
+    stream.getTracks().forEach((track) => track.stop());
+    activeMicStream = null;
+    startListeningButton.disabled = false;
+    updateMicStatus("Could not start microphone recording", "error");
+    addErrorMessage(`Microphone recording failed: ${error.message}`);
+    return;
+  }
+
+  listening = true;
+  micDeviceSelect.disabled = true;
+  stopListeningButton.disabled = false;
+  transcriptBuffer = "";
+  updateMicStatus("Recording… select Stop to transcribe", "ready");
+  mediaRecorder.ondataavailable = (event) => {
+    if (!event.data || event.data.size === 0) return;
+    audioBytesRecorded += event.data.size;
+    if (audioBytesRecorded > 20 * 1024 * 1024) {
+      audioLimitExceeded = true;
+      stopListening();
+      return;
+    }
+    audioChunks.push(event.data);
+  };
+  mediaRecorder.onerror = (event) => {
+    stopRecordingTracks();
+    listening = false;
+    startListeningButton.disabled = false;
+    stopListeningButton.disabled = true;
+    micDeviceSelect.disabled = false;
+    updateMicStatus("Audio recording failed", "error");
+    addErrorMessage(`Audio recording failed: ${event.error?.message || "unknown recorder error"}`);
+  };
+  mediaRecorder.onstop = transcribeRecording;
+  for (const track of stream.getAudioTracks()) {
+    track.addEventListener("ended", () => {
+      if (!listening) return;
+      stopListening();
+      addErrorMessage("The microphone was disconnected while recording.");
+    }, { once: true });
+  }
+  try {
+    mediaRecorder.start(250);
+  } catch (error) {
+    stopRecordingTracks();
+    listening = false;
+    startListeningButton.disabled = false;
+    stopListeningButton.disabled = true;
+    micDeviceSelect.disabled = false;
+    updateMicStatus("Could not start microphone recording", "error");
+    addErrorMessage(`Microphone recording failed: ${error.message}`);
   }
 }
 
 function stopListening() {
+  if (!mediaRecorder || mediaRecorder.state !== "recording") return;
   listening = false;
-  startListeningButton.disabled = false;
   stopListeningButton.disabled = true;
-  window.clearTimeout(speechRestartTimer);
-  if (speechRecognition) {
-    try {
-      speechRecognition.stop();
-    } catch (error) {
-      // Ignore stop errors while the recognition engine is already closing.
-    }
+  updateMicStatus("Preparing audio for transcription…", "ready");
+  try {
+    mediaRecorder.stop();
+  } catch (error) {
+    stopRecordingTracks();
+    startListeningButton.disabled = false;
+    micDeviceSelect.disabled = false;
+    updateMicStatus("Could not stop microphone recording", "error");
+    addErrorMessage(`Could not finish the microphone recording: ${error.message}`);
   }
+}
+
+async function transcribeRecording() {
+  listening = false;
+  stopListeningButton.disabled = true;
+  micDeviceSelect.disabled = false;
+  stopRecordingTracks();
+  const mimeType = mediaRecorder?.mimeType || audioChunks[0]?.type || "audio/webm";
+  const blob = new Blob(audioChunks, { type: mimeType });
+  audioChunks = [];
+
+  if (audioLimitExceeded) {
+    audioLimitExceeded = false;
+    startListeningButton.disabled = false;
+    updateMicStatus("Recording is too large", "error");
+    addErrorMessage("Audio recordings must be smaller than 20 MB. Record a shorter clip and retry.");
+    return;
+  }
+
+  if (!blob.size) {
+    startListeningButton.disabled = false;
+    updateMicStatus("No audio captured", "error");
+    addErrorMessage("No audio was captured. Check the selected microphone and try again.");
+    return;
+  }
+
+  if (blob.size > 20 * 1024 * 1024) {
+    startListeningButton.disabled = false;
+    updateMicStatus("Recording is too large", "error");
+    addErrorMessage("Audio recordings must be smaller than 20 MB. Record a shorter clip and retry.");
+    return;
+  }
+
+  updateMicStatus("Transcribing audio…", "ready");
+  setRequestPending(true);
+  try {
+    const result = await window.electronAPI.transcribeAudio({
+      audio: new Uint8Array(await blob.arrayBuffer()),
+      mimeType: blob.type || mimeType,
+    });
+    transcriptBuffer = [recordingDraft, result.transcript.trim()].filter(Boolean).join(" ");
+    questionInput.value = transcriptBuffer;
+    transcriptApplyButton.disabled = !transcriptBuffer;
+    updateMicStatus(
+      transcriptBuffer ? `Transcript ready · ${result.provider}` : "No speech detected",
+      transcriptBuffer ? "ready" : "error"
+    );
+    if (!transcriptBuffer) {
+      addErrorMessage("No speech was detected. Try a longer recording or check your microphone input level.");
+    }
+  } catch (error) {
+    updateMicStatus("Transcription failed", "error");
+    addErrorMessage(error.message);
+  } finally {
+    startListeningButton.disabled = false;
+    setRequestPending(false);
+  }
+}
+
+function stopRecordingTracks() {
   if (activeMicStream) {
     activeMicStream.getTracks().forEach((track) => track.stop());
     activeMicStream = null;
   }
-  updateMicStatus("Microphone off");
 }
 
 function updateProviderBadge(settings) {

@@ -7,7 +7,7 @@ An AI-powered coding assistant that helps you during screen sharing sessions. Th
 - Floating assistant overlay designed for screen-sharing workflows
 - Real-time AI assistance for coding questions and interview prep
 - Text-only assistant responses in the chat window
-- Microphone capture with browser speech recognition for question transcription
+- Microphone recording with provider-backed audio transcription into editable chat text
 - Screenshot analysis capabilities for supported vision-capable models
 - Interview session context fields for role, company, background summary, and job description
 - Provider selection for OpenAI, Google Gemini, and Anthropic
@@ -114,8 +114,8 @@ The built applications will be available in the `dist` directory.
 
 1. Launch the application
 2. Add the role, company, candidate background summary, and job description in the session metadata so the assistant can ground interview answers in your actual context.
-3. Select a microphone in the chat composer and click Listen to capture interviewer audio or your own spoken question.
-4. When a transcript appears, review it and click Use transcript to send it into the chat.
+3. Select a microphone and click Listen to record your question, then click Stop to transcribe it with the configured provider.
+4. Review the transcript in the composer and click Use transcript to send it into the chat.
 5. Use the keyboard shortcuts to control the assistant:
 
    - `Cmd/Ctrl + Shift + S`: Capture and analyze a screenshot
@@ -147,13 +147,14 @@ using Google's Interactions API.
 Anthropic requests use Claude Haiku 5.5,
 and OpenAI requests use GPT-4o mini.
 
-The app currently supports text-only responses in chat, with microphone capture
-implemented as an input workflow instead of spoken playback. Speech recognition
-uses the browser's Web Speech API when available. Depending on the Electron
-runtime, recognition may require an internet connection and a supported speech
-service; a network failure is reported separately from microphone connection or
-permission problems. Typing remains available as a fallback, and the app never
-emits an audio response by default.
+The app currently supports text-only responses in chat. Microphone audio is
+recorded locally until you stop the recording, then sent to the configured
+OpenAI or Gemini transcription API; only the resulting transcript is placed in
+the editable composer. Audio is not stored by the app. If Claude is the active
+chat provider, transcription uses a configured Gemini or OpenAI key when
+available. Microphone use requires OS permission and an internet connection.
+Typing remains available as a fallback, and the app never emits an audio
+response by default.
 
 Windows builds disable electron-builder's executable-editing helper because
 that helper requires symbolic-link privileges when extracting on some Windows

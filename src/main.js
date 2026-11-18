@@ -142,10 +142,6 @@ ipcMain.handle("get-microphone-error-message", (_event, errorName) =>
   microphoneErrors.getMicrophoneErrorMessage(errorName)
 );
 
-ipcMain.handle("get-speech-recognition-error-message", (_event, errorName) =>
-  microphoneErrors.getSpeechRecognitionErrorMessage(errorName)
-);
-
 ipcMain.handle("update-session-meta", (_event, sessionId, updates = {}) => {
   if (!sessionId) return getActiveSession();
   return updateSessionMeta(sessionId, updates);

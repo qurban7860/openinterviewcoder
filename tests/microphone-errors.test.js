@@ -1,17 +1,13 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const {
-  getMicrophoneErrorMessage,
-  getSpeechRecognitionErrorMessage,
-} = require('../src/microphone-errors');
+const { getMicrophoneErrorMessage } = require('../src/microphone-errors');
 
-test('speech network errors explain that recognition service is unavailable, not the microphone', () => {
-  const error = getSpeechRecognitionErrorMessage('network');
+test('busy microphone errors explain how to recover', () => {
+  const error = getMicrophoneErrorMessage('NotReadableError');
 
-  assert.match(error.message, /speech recognition service/i);
-  assert.match(error.message, /internet connection/i);
-  assert.equal(error.terminal, true);
+  assert.match(error, /microphone is busy or unavailable/i);
+  assert.match(error, /other apps/i);
 });
 
 test('microphone device errors provide a device-specific recovery message', () => {

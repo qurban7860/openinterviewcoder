@@ -115,10 +115,10 @@
           <select id="mic-device-select" class="mic-device-select">
             <option value="">Detecting microphones…</option>
           </select>
-          <button id="start-listening" type="button" class="microphone-button">Listen</button>
+          <button id="start-listening" type="button" class="microphone-button" title="Record microphone audio, then select Stop to transcribe">Listen</button>
           <button id="stop-listening" type="button" class="microphone-button secondary-button" disabled>Stop</button>
-          <button id="transcript-apply-button" type="button" class="microphone-button secondary-button">Use transcript</button>
-          <span id="mic-status" class="mic-status">Microphone off</span>
+          <button id="transcript-apply-button" type="button" class="microphone-button secondary-button" disabled>Use transcript</button>
+          <span id="mic-status" class="mic-status" role="status" aria-live="polite">Microphone off</span>
         </div>
         <div class="composer-footer">
           <span><kbd>Enter</kbd> to send <span class="footer-divider">·</span> <kbd>Shift + Enter</kbd> for a new line</span>

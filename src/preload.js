@@ -40,6 +40,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   // Test response
   testResponse: (prompt) => ipcRenderer.invoke("test-response", prompt),
+  transcribeAudio: (data) => ipcRenderer.invoke("transcribe-audio", data),
 
   // File handling
   openFile: (path) => shell.openPath(path),
@@ -57,8 +58,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
   buildInterviewBrief: (values) => ipcRenderer.invoke("build-interview-brief", values),
   getMicrophoneErrorMessage: (errorName) =>
     ipcRenderer.invoke("get-microphone-error-message", errorName),
-  getSpeechRecognitionErrorMessage: (errorName) =>
-    ipcRenderer.invoke("get-speech-recognition-error-message", errorName),
 
   // Window position
   onWindowPositionChanged: (callback) =>

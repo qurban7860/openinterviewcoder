@@ -141,7 +141,7 @@ function renderCapabilityMatrix() {
   };
 
   const providerData = {
-    openai: { text: true, vision: true, streaming: true, transcription: false },
+    openai: { text: true, vision: true, streaming: true, transcription: true },
     gemini: { text: true, vision: true, streaming: true, transcription: true },
     anthropic: { text: true, vision: true, streaming: true, transcription: false },
   };
